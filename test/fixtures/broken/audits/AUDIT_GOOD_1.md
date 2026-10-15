@@ -5,7 +5,7 @@ date: 2026-10-01
 checked: 2026-10-01
 scope: "frontend"
 slug: GOOD1
-addition: AUDIT_GOOD_1.ADDITION.md
+resolved: AUDIT_GOOD_1.RESOLVED.md
 verify: GOOD1-1 in `app.ts`
 ---
 

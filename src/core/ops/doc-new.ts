@@ -30,7 +30,10 @@ export const initialStatus = (index: StoreIndex, type: string): string => {
 const defaultSlug = (name: string, prefix: string): string =>
   name.slice(prefix.length).replaceAll("_", "");
 
-const customTemplate = async (index: StoreIndex, type: string): Promise<string | undefined> => {
+export const customTemplate = async (
+  index: StoreIndex,
+  type: string,
+): Promise<string | undefined> => {
   if (!index.config.templates) return undefined;
   const file = Bun.file(join(index.root, index.config.templates, `${type}.md`));
   return (await file.exists()) ? file.text() : undefined;

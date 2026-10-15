@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { TroveError } from "../../core/errors.ts";
-import { excerpt } from "../../core/index/excerpt.ts";
+import { excerpts, formatExcerpts } from "../../core/index/excerpt.ts";
 import { findDocument } from "../../core/index/resolve.ts";
 import { KINDS, queryRows } from "../../core/index/rows.ts";
 import { regulation, TOPICS } from "../../core/regulation/regulation.ts";
@@ -41,13 +41,12 @@ export const registerReadTools = (server: McpServer, context: Context): void => 
     "trove_show",
     {
       description:
-        "Read one item's own section by id (e.g. WEB1-3), one section as DOCUMENT#heading, or a document's outline by name. Prefer this to reading whole files.",
+        "Read one item's own section by id (e.g. WEB1-3; a closed one too, every section titled by it when no ledger holds it), one section as DOCUMENT#heading, or a document's outline by name. Prefer this to reading whole files.",
       inputSchema: z.object({ store: storeField, ref: z.string() }),
       annotations: READ_ONLY,
     },
     guarded(async ({ store, ref }) => {
-      const found = excerpt((await openFor(context, store)).index, ref);
-      return text(`${found.file}:${found.line}\n\n${found.text}`);
+      return text(formatExcerpts(excerpts((await openFor(context, store)).index, ref)));
     }),
   );
 

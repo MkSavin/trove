@@ -69,7 +69,7 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 | `trove check [file] [--all] [--json]` | Run every rule; exits 1 on errors. `--all` also lists every document. |
 | `trove query items status=open owner=web` | Filter items or documents by any field (see filters below). |
 | `trove summary show [kind] [filters]` | A summary on screen, nothing written: a configured kind, or counts, open items by document and documents in work under the given filters. |
-| `trove show WEB1-4` | Print one item's section. Also takes `DOC#heading`, or a document name for its outline. |
+| `trove show WEB1-4` | Print one item's section, a closed one too; when no ledger holds the id, every section titled by it, archive included. Also takes `DOC#heading`, or a document name for its outline. |
 | `trove prompt PROMPT_X [--copy]` | Print a prompt's task text, or copy it; Cyrillic survives on Windows too. |
 | `trove report [name...]` · `trove rules` | Rebuild generated documents · list rules with their effective level. |
 | `trove links [--dead]` | Relative links to documents and code; code is checked under `roots` present on this machine, in the checkout or, with `{ path, ref: origin/main }`, at that commit whatever branch is checked out. |
@@ -84,13 +84,13 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 | `trove doc retype <doc> <type>` | Turn a document into another type, e.g. research that became a plan of work: folder, prefix, status, title, links and references follow. |
 | `trove summary new <kind> [filters] [--name]` | A dated summary document of that kind: its generated blocks filled, `<!-- write: … -->` places left for the analysis. |
 | `trove doc checked <doc>` · `trove doc set <doc> <field> <value>` | Re-checked today · any header field; `status` also updates the status line. |
-| `trove item add <doc> column=value...` | A ledger row with the next free id and a section stub. Numbers of closed items are never reused. |
-| `trove item close <id> [--commit SHA] [--archive]` | Drop the row, mark the section closed, list other mentions; `--archive` when it was the last open item. |
+| `trove item add <doc> column=value...` | A ledger row with the next free id and a section stub (`ledger.heading`, `ledger.stub`). Numbers of closed items are never reused. |
+| `trove item close <id> [--as OUTCOME] [--commit SHA] [--archive]` | Drop the row and list other mentions. A type with `closeInto` moves the row and the section into its resolved companion; others mark the section closed in place. `--as` names the outcome (`fixed`, `dropped`, `moved`); `--archive` when it was the last open item. |
 | `trove item defer <id>` | Status cell and section note to deferred. |
 | `trove item move <id> <doc> [--archive]` | Move an item with its section to another ledger under the next id there; columns the target lacks are reported. |
 | `trove sync [-m TEXT]` | Commit hand edits together with rebuilt reports, then push by mode. Refuses while `check` is red. |
 
-**Filters** work the same in `query`, `summary`, `export`, report configs, generated blocks and MCP tools: `field=value` matches the raw text or the vocabulary key (`status=open` and `status=открыто` are the same), `~text` a substring, `*` and `**` a glob, and `!` in front excludes. Items also filter on their document's fields: `owner=web path=!audits/mobile/**` is everything for the web team outside the mobile audits. Repeat a field or use commas for alternatives.
+**Filters** work the same in `query`, `summary`, `export`, report configs, generated blocks and MCP tools: `field=value` matches the raw text or the vocabulary key (`status=open` and `status=открыто` are the same), `~text` a substring, `*` and `**` a glob, and `!` in front excludes. Items also filter on their document's fields: `owner=web path=!audits/mobile/**` is everything for the web team outside the mobile audits. Repeat a field or use commas for alternatives. Closed items are left out unless a filter names `state` (`state=closed`, `state=open,closed`).
 
 Commands find their store from the current folder: inside a store, then through the project's `.trove.yaml` (by `scope` when there are several), then through the registry. `--store <name|dir>` or `$TROVE_STORE` overrides.
 
@@ -137,11 +137,14 @@ The skills, `trove-store` and `trove-migrate`, live once in [`plugin/skills`](pl
 | `freshness` | goes stale when `checked` is older than the limit |
 | `prompt-body` | the task text starts after `<!-- prompt -->` |
 | `generated` | built by `trove report`, never edited by hand |
-| `series`, `versions`, `addition-of` | numbering (`_2`), versions (`_V2`) and addenda; used when creating documents |
+| `series`, `versions` | numbering (`_2`) and versions (`_V2`); used when creating documents |
+| `resolved-of` | holds the closed items of the document in `base`: a ledger of the same columns plus their sections; `trove item close` moves them here |
 
 **What goes where.** Every type carries a `purpose`: what belongs in it and what does not. `trove regulation placement` prints them as one table, and a store's AGENTS.md can embed that table between `<!-- regulation:placement -->` and `<!-- /regulation:placement -->`; every report run rebuilds it, so the notes never drift from the config.
 
-**Ledger.** Markdown tables inside ledger blocks; a document may hold several, and each item knows the heading it sits under (`section`). Columns are matched by header label, so tables with and without optional columns live side by side. A type with its own `ledger:` (ids, columns, statuses) keeps it apart from the audits, as a debt or risk register does. With `id: "DEBT-{section}{n}"` and `sections: { Server: S, Mobile: M }` each table numbers its own ids (`DEBT-S3`), and `trove item add DEBT section=Server …` adds to that table and places the item's section after the table's last one. `closed: "closed {date}, {commit}"` sets how a closed item's heading is marked.
+**Ledger.** Markdown tables inside ledger blocks; a document may hold several, and each item knows the heading it sits under (`section`). Columns are matched by header label, so tables with and without optional columns live side by side. A type with its own `ledger:` (ids, columns, statuses) keeps it apart from the audits, as a debt or risk register does. With `id: "DEBT-{section}{n}"` and `sections: { Server: S, Mobile: M }` each table numbers its own ids (`DEBT-S3`), and `trove item add DEBT section=Server …` adds to that table and places the item's section after the table's last one. `closed: { fixed: fixed, dropped: dropped }` names the ways an item gets closed, the first being the default; `note: "{status} {date}, {commit}"` marks a closed item's heading. `heading: "{id}. {what}"` and `stub:` (Markdown lines with the same placeholders) shape the section `item add` writes; a note in parentheses that trove did not write stays part of the title.
+
+**Closed items.** A type with `closeInto: resolved` keeps its ledger for open work. `item close` moves the row into the closed-items ledger of the document's companion, `AUDIT_WEB_1.RESOLVED.md` next to it (same columns, the status holding the outcome), and the item's section below it with its heading marked. The companion is created on the first close with `base:` and a link back, keeps the audit's working notes as well, and is archived together with the audit.
 
 **Generated blocks.** Any hand-written document can hold a block that trove keeps current:
 

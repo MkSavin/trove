@@ -1,5 +1,5 @@
 import { TroveError } from "../../core/errors.ts";
-import { excerpt } from "../../core/index/excerpt.ts";
+import { excerpts, formatExcerpts } from "../../core/index/excerpt.ts";
 import { parse, STORE_OPTIONS } from "../args.ts";
 import { type Command, EXIT } from "../command.ts";
 import { openFromFlags } from "../store.ts";
@@ -17,12 +17,8 @@ export const show: Command = {
     if (ref === undefined) throw new TroveError("show what? pass an item id or a document name");
 
     const store = await openFromFlags(values, io);
-    const result = excerpt(store.index, ref);
-    io.print(
-      values.json
-        ? JSON.stringify(result, null, 2)
-        : `${result.file}:${result.line}\n\n${result.text}`,
-    );
+    const found = excerpts(store.index, ref);
+    io.print(values.json ? JSON.stringify(found, null, 2) : formatExcerpts(found));
     return EXIT.ok;
   },
 };

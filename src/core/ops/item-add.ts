@@ -1,3 +1,4 @@
+import type { LedgerConfig } from "../config/schema.ts";
 import { labelOf } from "../config/vocabulary.ts";
 import type { Document } from "../document/document.ts";
 import type { LedgerTable } from "../document/ledger.ts";
@@ -17,6 +18,25 @@ export type NewItem = {
 };
 
 const DEFAULT_LEVEL = 3;
+const FIELD = /\{(\w+)\}/g;
+const LINE_BREAK = /\r?\n/;
+
+const fillItem = (template: string, values: Readonly<Record<string, string>>): string =>
+  template.replace(FIELD, (whole, key: string) => values[key] ?? whole);
+
+/** The heading of a new item's section by `ledger.heading`, then `ledger.stub` under it. */
+export const itemSection = (
+  ledger: LedgerConfig,
+  values: Readonly<Record<string, string>>,
+  level: number,
+  eol: string,
+): string => {
+  const heading = `${"#".repeat(level)} ${fillItem(ledger.heading, values)}`;
+  const stub = ledger.stub
+    ? ["", ...fillItem(ledger.stub.trimEnd(), values).split(LINE_BREAK)]
+    : [];
+  return `${[heading, ...stub].join(eol)}${eol}`;
+};
 
 /** The table under the named heading; else the one whose rows share the owner; else the last. */
 export const pickTable = (
@@ -89,8 +109,7 @@ export const addItem = (index: StoreIndex, input: NewItem): Plan => {
   }
 
   const cells = table.keys.map((key) => (key ? (values[key] ?? "") : ""));
-  const eol = eolOf(doc.text);
-  const section = `${"#".repeat(sectionLevel(doc))} ${id}. ${values.what ?? ""} (${status})${eol}`;
+  const section = itemSection(ledger, values, sectionLevel(doc), eolOf(doc.text));
   const offset = sectionOffset(doc, table);
   const text = applyPatches(doc.text, [
     appendRow(doc, table, cells),

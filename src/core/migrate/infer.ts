@@ -7,8 +7,10 @@ import { LANGUAGES, type Language, presetConfig } from "../presets/presets.ts";
 import {
   fitFields,
   fitFinished,
+  fitIds,
   fitLedger,
   fitReports,
+  fitRequired,
   fitStatusLabels,
   fitStatusLines,
 } from "./fit.ts";
@@ -93,8 +95,10 @@ export const inferConfig = async (
   const notes: string[] = [];
   const fitted = [
     fitFields,
+    fitRequired,
     fitStatusLines,
     fitLedger,
+    fitIds,
     fitFinished,
     fitStatusLabels,
     fitReports,

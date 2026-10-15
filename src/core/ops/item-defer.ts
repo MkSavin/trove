@@ -11,8 +11,8 @@ import type { Plan } from "./plan.ts";
 const DEFERRED = "deferred";
 
 export const deferItem = (index: StoreIndex, id: string): Plan => {
-  const { doc, table, row } = requireItem(index, id);
-  const statuses = doc.ledger?.config.columns.find((column) => column.key === "status")?.enum;
+  const { doc, ledger, table, row } = requireItem(index, id);
+  const statuses = ledger.columns.find((column) => column.key === "status")?.enum;
   if (statuses && !Object.hasOwn(statuses, DEFERRED)) {
     throw new TroveError(`the status column has no ${DEFERRED} value`);
   }
@@ -20,7 +20,7 @@ export const deferItem = (index: StoreIndex, id: string): Plan => {
   const heading = itemHeading(doc, id);
   const text = applyPatches(doc.text, [
     setCell(row, table.keys.indexOf("status"), label),
-    ...(heading ? setHeadingNote(doc, heading, label) : []),
+    ...(heading ? setHeadingNote(doc, heading, label, ledger) : []),
   ]);
   return { changes: [{ rel: doc.rel, text }], notes: [], message: `docs: defer ${id}` };
 };

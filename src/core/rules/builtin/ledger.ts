@@ -1,18 +1,28 @@
 import { hasCapability, keyOf, ledgerOf } from "../../config/vocabulary.ts";
+import type { Document } from "../../document/document.ts";
+import { splitRefs } from "../../document/refs.ts";
+import type { StoreIndex } from "../../index/index.ts";
 import { defineRule, type Finding, type StoreFinding } from "../rule.ts";
 
 const NON_BREAKING_HYPHEN = "‑";
+const SECTION = "section";
+
+/** Closed items keep the ids of their base document, so its header fills the template. */
+const idOwner = (index: StoreIndex, doc: Document): Document => {
+  if (!hasCapability(doc.typeConfig, "resolved-of")) return doc;
+  const [base] = splitRefs(doc.meta.base ?? "");
+  return (base && index.byName.get(base)) || doc;
+};
 const TEMPLATE_PART = /\{(\w+)\}/;
 
-/** Missing when the header lacks a field the template needs. */
+const templateFields = (template: string): string[] =>
+  template.split(TEMPLATE_PART).filter((part, i) => i % 2 === 1 && part !== "n");
+
 const idPattern = (
   template: string,
   values: Readonly<Record<string, string | undefined>>,
-): RegExp | undefined => {
+): RegExp => {
   const parts = template.split(TEMPLATE_PART);
-  const fields = parts.filter((part, i) => i % 2 === 1 && part !== "n");
-  if (fields.some((name) => values[name] === undefined)) return undefined;
-
   const source = parts.map((part, i) => {
     if (i % 2 === 0) return RegExp.escape(part);
     return part === "n" ? ".+" : RegExp.escape(values[part] ?? "");
@@ -93,17 +103,30 @@ export const idFormat = defineRule({
   level: "error",
   summary: "Item ids follow `ledger.id`, e.g. `{slug}-{n}`.",
   scope: "document",
-  check: (doc) => {
+  check: (doc, { index }) => {
     const ledger = doc.ledger?.config;
-    if (!ledger) return [];
-    return (doc.ledger?.items ?? []).flatMap((item) => {
+    const items = doc.ledger?.items ?? [];
+    if (!ledger || items.length === 0) return [];
+    const owner = idOwner(index, doc);
+    const missing = templateFields(ledger.id).filter(
+      (field) => field !== SECTION && owner.meta[field] === undefined,
+    );
+    if (missing.length > 0) {
+      return [
+        {
+          line: 1,
+          message: `ids follow ${ledger.id}, but ${owner.rel} has no ${missing.join(", ")}`,
+        },
+      ];
+    }
+    return items.flatMap((item) => {
       const code = item.section === undefined ? undefined : ledger.sections?.[item.section];
       if (code === undefined && ledger.id.includes("{section}")) {
         const message = `${item.id} sits under ${item.section ?? "no heading"}, which has no id code in sections`;
         return [{ line: item.line, message }];
       }
-      const pattern = idPattern(ledger.id, { ...doc.meta, section: code });
-      if (pattern?.test(item.id) !== false) return [];
+      const pattern = idPattern(ledger.id, { ...owner.meta, section: code });
+      if (pattern.test(item.id)) return [];
       return [{ line: item.line, message: `${item.id} does not match ${ledger.id}` }];
     });
   },

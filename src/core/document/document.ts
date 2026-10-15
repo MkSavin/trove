@@ -1,6 +1,12 @@
 import { basename } from "node:path";
 import type { Config, DocumentTypeConfig } from "../config/schema.ts";
-import { hasCapability, keyOf, ledgerOf, typeConfig } from "../config/vocabulary.ts";
+import {
+  closedLedgerOf,
+  hasCapability,
+  keyOf,
+  ledgerOf,
+  typeConfig,
+} from "../config/vocabulary.ts";
 import { findBlock, findBlocks } from "../markdown/blocks.ts";
 import { fencedLines } from "../markdown/fences.ts";
 import { type FrontMatter, parseFrontMatter } from "../markdown/front-matter.ts";
@@ -30,7 +36,7 @@ export type Document = {
   headings: readonly Heading[];
   links: readonly Link[];
   statusLine: StatusLine | undefined;
-  /** Present only for types with the matching capability and a marker in the text. */
+  /** Present only for types with the matching capability and a marker in the text; closed items for `resolved-of`. */
   ledger: Ledger | undefined;
   prompt: PromptBody | undefined;
 };
@@ -48,7 +54,11 @@ export const parseDocument = ({ path, rel, text }: Source, config: Config): Docu
   const kind = typeConfig(config, type);
   const body = lines.slice(frontMatter?.endLine ?? 0);
 
-  const ledgerConfig = hasCapability(kind, "ledger") ? ledgerOf(config, kind) : undefined;
+  const ledgerConfig = hasCapability(kind, "ledger")
+    ? ledgerOf(config, kind)
+    : hasCapability(kind, "resolved-of")
+      ? closedLedgerOf(config, type)
+      : undefined;
   const ledgerBlocks = ledgerConfig ? findBlocks(lines, fenced, ledgerConfig.marker) : [];
   const headings = parseHeadings(lines, fenced, text.length);
   const promptBlock = hasCapability(kind, "prompt-body")
@@ -72,7 +82,7 @@ export const parseDocument = ({ path, rel, text }: Source, config: Config): Docu
     statusLine: frontMatter ? readStatusLine(body, config.labels) : undefined,
     ledger:
       ledgerConfig && ledgerBlocks.length > 0
-        ? readLedger(ledgerBlocks, rel, ledgerConfig, headings)
+        ? readLedger(ledgerBlocks, rel, ledgerConfig, headings, hasCapability(kind, "resolved-of"))
         : undefined,
     prompt: promptBlock ? readPrompt(promptBlock, text) : undefined,
   };

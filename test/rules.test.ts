@@ -38,7 +38,7 @@ describe("built-in rules on the fixture store", () => {
   test("leave healthy documents alone", () => {
     const healthy = [
       "audits/AUDIT_GOOD_1.md",
-      "audits/AUDIT_GOOD_1.ADDITION.md",
+      "audits/AUDIT_GOOD_1.RESOLVED.md",
       "prompts/PROMPT_GOOD.md",
     ];
     expect(diagnostics.filter((d) => healthy.includes(d.file))).toEqual([]);

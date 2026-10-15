@@ -5,8 +5,11 @@ import { eolOf, insert, type Patch, replace } from "./patch.ts";
 const SEPARATOR = ": ";
 const NEEDS_QUOTES = /: | #|^[\s"'[\]{}>|*&!%@`#,]|\s$/;
 
+const ESCAPED = /["\\]/g;
+
+/** Double quotes escape `\` and `"`, so Windows paths stay valid YAML. */
 export const formatValue = (value: string, quoted = false): string =>
-  quoted || NEEDS_QUOTES.test(value) ? `"${value}"` : value;
+  quoted || NEEDS_QUOTES.test(value) ? `"${value.replace(ESCAPED, "\\$&")}"` : value;
 
 /** Rewrites a header field in place, or adds it before the closing `---`. */
 export const setField = (doc: Document, key: string, value: string): Patch => {

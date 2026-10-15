@@ -6,7 +6,7 @@ sync: off
 roots: {}
 
 folders:
-  audits: { prefix: AUDIT_, types: [audit, addition] }
+  audits: { prefix: AUDIT_, types: [audit, resolved] }
   specs: { prefix: SPEC_, types: [spec] }
   plans: { prefix: PLAN_, types: [plan] }
   research: { prefix: [RESEARCH_, INCIDENT_, STUDY_], types: [research, incident, study] }
@@ -26,6 +26,7 @@ labels:
   statusLine: Статус документа
   checked: Сверено
   ledger: Реестр открытых пунктов
+  closedLedger: Закрытые пункты
   count: пунктов
   summaryCounts: По приоритетам
   summaryItems: Открытые пункты
@@ -45,12 +46,13 @@ types:
   audit:
     purpose: "Находки по существующему коду и реестр того, что осталось исправить. Не для кода, который ещё предстоит написать: это спека или план."
     capabilities: [ledger, series, status-line, freshness]
+    closeInto: resolved
     fields:
       slug: required
-      addition: { format: refs }
-  addition:
-    purpose: "Рабочие материалы одного аудита: черновые id, поправки, проверенное и снятое. Открытых пунктов не несёт."
-    capabilities: [addition-of, status-line, freshness]
+      resolved: { format: refs }
+  resolved:
+    purpose: "Закрытые пункты одного аудита с разбором и его рабочие материалы: черновые id, поправки, проверенное и снятое. Открытых пунктов не несёт."
+    capabilities: [resolved-of, status-line, freshness]
     initial: current
     fields:
       base: { required: true, format: refs }
@@ -85,7 +87,8 @@ ledger:
     - { key: status, label: статус, required: true, enum: { open: открыто, deferred: отложено } }
     - { key: what, label: что осталось, required: true }
   open: [open]
-  closed: закрыто
+  closed: { fixed: исправлено, dropped: снято, moved: перенесено }
+  note: "{status} {date}, {commit}"
 
 lifecycle:
   audit:

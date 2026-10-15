@@ -26,18 +26,23 @@ const itemAdd: Command = {
 
 const itemClose: Command = {
   name: "close",
-  summary: "Remove an item's row and mark its section closed",
-  usage: "trove item close <id> [--commit SHA] [--archive] [--dry-run]",
+  summary: "Close an item: into the resolved companion, or marked closed in place",
+  usage: "trove item close <id> [--as OUTCOME] [--commit SHA] [--archive] [--dry-run]",
   run: async (argv, io) => {
     const { values, positionals } = parse(argv, {
       ...OP_OPTIONS,
+      as: { type: "string" },
       commit: { type: "string" },
       archive: { type: "boolean", default: false },
     });
     const [id] = positionals;
     if (!id) throw new TroveError("item close needs an id");
     const store = await openFromFlags(values, io);
-    const plan = closeItem(store.index, id, { commit: values.commit, archive: values.archive });
+    const plan = await closeItem(store.index, id, {
+      as: values.as,
+      commit: values.commit,
+      archive: values.archive,
+    });
     return runPlan(store, plan, io, values["dry-run"]);
   },
 };

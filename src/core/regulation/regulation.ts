@@ -92,7 +92,7 @@ Finished documents move to \`${config.archive.folder}/\` under the same path.
 
 const types = (config: Config): string => `# Document types
 
-A type is a set of capabilities. \`ledger\`: a table of open items; \`status-line\`: the visible status line; \`freshness\`: re-check within the limit; \`prompt-body\`: task text after \`<!-- ${PROMPT_MARKER} -->\`; \`generated\`: built by reports, never edited; \`series\`: numbered \`_N\`; \`versions\`: \`_V2\` with \`supersedes\`; \`addition-of\`: an addendum with \`base\`.
+A type is a set of capabilities. \`ledger\`: a table of open items; \`status-line\`: the visible status line; \`freshness\`: re-check within the limit; \`prompt-body\`: task text after \`<!-- ${PROMPT_MARKER} -->\`; \`generated\`: built by reports, never edited; \`series\`: numbered \`_N\`; \`versions\`: \`_V2\` with \`supersedes\`; \`resolved-of\`: the closed items of the document named in \`base\`, in a ledger of the same columns.
 
 ${table(
   ["type", "capabilities", "statuses", "starts as", "own fields"],
@@ -120,7 +120,7 @@ ${table(
   ]),
 )}
 
-Ids follow ${code(spec.id)}; open means ${spec.open.map(code).join(", ")}; a closed item's heading says ${code(spec.closed)}.
+Ids follow ${code(spec.id)}; open means ${spec.open.map(code).join(", ")}; an item is closed as ${Object.values(spec.closed).map(code).join(", ")}, its heading noted ${code(spec.note)}.
 `;
 
 const ledger = (config: Config): string => {

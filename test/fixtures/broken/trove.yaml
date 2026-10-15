@@ -6,7 +6,7 @@ sync: off
 roots: {}
 
 folders:
-  audits: { prefix: AUDIT_, types: [audit, addition] }
+  audits: { prefix: AUDIT_, types: [audit, resolved] }
   specs: { prefix: SPEC_, types: [spec] }
   plans: { prefix: PLAN_, types: [plan] }
   research: { prefix: [RESEARCH_, INCIDENT_], types: [research, incident] }
@@ -42,10 +42,10 @@ types:
     capabilities: [ledger, series, status-line, freshness]
     fields:
       slug: required
-      addition: { format: refs }
-  addition:
-    purpose: "Рабочие материалы одного аудита: черновые id, поправки, проверенное и снятое. Открытых пунктов не несёт."
-    capabilities: [addition-of, status-line, freshness]
+      resolved: { format: refs }
+  resolved:
+    purpose: "Закрытые пункты одного аудита с разбором и его рабочие материалы: черновые id, поправки, проверенное и снятое. Открытых пунктов не несёт."
+    capabilities: [resolved-of, status-line, freshness]
     initial: current
     fields:
       base: { required: true, format: refs }

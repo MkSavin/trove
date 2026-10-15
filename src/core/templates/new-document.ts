@@ -59,8 +59,9 @@ export const renderNewDocument = (config: Config, input: NewDocument): string =>
     "",
     `# ${input.name} — ${input.title}`,
     "",
-    `**${statusLine}:** ${status}. ${checked} ${input.date}.`,
-    "",
+    ...(hasCapability(kind, "status-line")
+      ? [`**${statusLine}:** ${status}. ${checked} ${input.date}.`, ""]
+      : []),
     ...(hasCapability(kind, "ledger") ? ledgerSection(config, input.type) : []),
     ...(hasCapability(kind, "prompt-body") ? [`<!-- ${PROMPT_MARKER} -->`, ""] : []),
   ].join("\n");

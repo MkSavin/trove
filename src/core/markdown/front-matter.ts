@@ -10,7 +10,16 @@ export type FrontMatter = {
 
 const FENCE = "---";
 const SEPARATOR = ": ";
-const QUOTES = /^"|"$/g;
+const DOUBLE_QUOTED = /^"(.*)"$/;
+const SINGLE_QUOTED = /^'(.*)'$/;
+const ESCAPE = /\\(["\\])/g;
+
+const unquote = (raw: string): string => {
+  const double = DOUBLE_QUOTED.exec(raw)?.[1];
+  if (double !== undefined) return double.replace(ESCAPE, "$1");
+  const single = SINGLE_QUOTED.exec(raw)?.[1];
+  return single === undefined ? raw : single.replaceAll("''", "'");
+};
 
 /** Line-based `key: value` reading: values in such archives are free text that strict YAML rejects. */
 export const parseFrontMatter = (lines: readonly Line[]): FrontMatter | undefined => {
@@ -23,10 +32,7 @@ export const parseFrontMatter = (lines: readonly Line[]): FrontMatter | undefine
     const at = line.text.indexOf(SEPARATOR);
     if (at < 0) continue;
     const key = line.text.slice(0, at);
-    const value = line.text
-      .slice(at + SEPARATOR.length)
-      .trim()
-      .replace(QUOTES, "");
+    const value = unquote(line.text.slice(at + SEPARATOR.length).trim());
     fields.set(key, { key, value, line: line.number });
   }
   return { fields, endLine: end + 1 };

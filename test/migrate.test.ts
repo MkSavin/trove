@@ -178,6 +178,48 @@ describe("inferConfig", () => {
     expect(opened.index.items.map((item) => item.id)).toEqual(["DEBT-5", "REL2-1"]);
   });
 
+  test("keeps the regulation wider than what the documents happened to use", async () => {
+    const root = join(workspace, "narrow");
+    const doc = (rel: string, type: string, rows: string) =>
+      Bun.write(
+        join(root, rel),
+        `---\ntype: ${type}\nstatus: open\ndate: 2026-10-01\nchecked: 2026-10-01\nscope: x\nverify: run it\nslug: N1\n---\n\n# T\n\n<!-- ledger -->\n| id | P | area | status | todo |\n| -- | - | ---- | ------ | ---- |\n${rows}<!-- /ledger -->\n`,
+      );
+    await doc(
+      "audits/AUDIT_N_1.md",
+      "audit",
+      "| N1-1 | P2 | a | open | x |\n| N1-2 | P4 | a | open | y |\n",
+    );
+    await doc("plans/PLAN_N.md", "plan", "");
+    const inferred = await inferConfig(root, "en");
+    const config = parseConfig(inferred.text, "inferred");
+    const column = (key: string) => config.ledger?.columns.find((c) => c.key === key)?.enum;
+    expect(Object.keys(column("priority") ?? {})).toEqual(["P0", "P1", "P2", "P3", "P4"]);
+    expect(Object.keys(column("status") ?? {})).toEqual(["open", "deferred"]);
+    expect(config.types.audit?.fields.verify?.required).toBe(true);
+    expect(config.types.plan?.fields.verify?.required).toBe(true);
+    expect(
+      Object.values(config.types).filter((type) => type.capabilities.includes("status-line")),
+    ).toEqual([]);
+    expect(inferred.notes).toContain(
+      "ledger priority: P0, P1, P2, P3, P4; widen it in the config if more are allowed",
+    );
+    expect(inferred.notes).toContain(
+      "verify required for audit, plan: every document of these types has it",
+    );
+  });
+
+  test("reads an id template off a ledger whose documents lack the id fields", async () => {
+    const root = join(workspace, "debt");
+    await Bun.write(
+      join(root, "DEBT.md"),
+      "---\ntype: debt\nstatus: current\ndate: 2026-10-01\nchecked: 2026-10-01\nscope: x\n---\n\n# Debt\n\n## Server\n\n<!-- ledger -->\n| id | status | what |\n| -- | ------ | ---- |\n| DEBT-S1 | open | a |\n<!-- /ledger -->\n\n## Infra\n\n<!-- ledger -->\n| id | status | what |\n| -- | ------ | ---- |\n| DEBT-I1 | open | b |\n| DEBT-I2 | open | c |\n<!-- /ledger -->\n",
+    );
+    const config = parseConfig((await inferConfig(root, "en")).text, "inferred");
+    expect(config.types.debt?.ledger?.id).toBe("DEBT-{section}{n}");
+    expect(config.types.debt?.ledger?.sections).toEqual({ Server: "S", Infra: "I" });
+  });
+
   test("keeps the group order of the existing backlog", async () => {
     const inferred = await inferConfig(archive);
     const section = parseConfig(inferred.text, "inferred").reports.backlog?.sections[0];

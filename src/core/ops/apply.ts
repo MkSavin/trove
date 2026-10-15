@@ -1,13 +1,11 @@
 import { mkdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { parseDocument } from "../document/document.ts";
-import { indexDocuments, type StoreIndex } from "../index/index.ts";
 import { planGenerated } from "../reports/write.ts";
 import type { Diagnostic } from "../rules/diagnostic.ts";
 import { runRules } from "../rules/run.ts";
 import type { Store } from "../store/open.ts";
-import { compareText } from "../text/compare.ts";
 import type { Change, Plan } from "./plan.ts";
+import { withChanges } from "./with-changes.ts";
 
 export type AppliedChange = Change & { previous: string | undefined };
 
@@ -18,27 +16,6 @@ export type Outcome = {
   notes: readonly string[];
   message: string;
   written: boolean;
-};
-
-const withChanges = (index: StoreIndex, changes: readonly Change[]): StoreIndex => {
-  const gone = new Set(changes.flatMap((change) => [change.from, change.rel]));
-  const added = changes.flatMap((change) =>
-    change.text === undefined
-      ? []
-      : [
-          parseDocument(
-            { path: join(index.root, change.rel), rel: change.rel, text: change.text },
-            index.config,
-          ),
-        ],
-  );
-  const documents = [...index.documents.filter((doc) => !gone.has(doc.rel)), ...added];
-  return indexDocuments(
-    index.root,
-    index.config,
-    documents.toSorted((a, b) => compareText(a.rel, b.rel)),
-    index.today,
-  );
 };
 
 /** Errors the change adds; a moved file's old errors count under its new path. */

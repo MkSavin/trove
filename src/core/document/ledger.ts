@@ -10,6 +10,8 @@ export type Item = {
   status: string | undefined;
   /** Counted as open by its ledger: keeps the document out of the archive. */
   open: boolean;
+  /** Sits in the ledger of closed items of a `resolved-of` document. */
+  closed: boolean;
   /** Raw cell text by column key. */
   values: Readonly<Record<string, string>>;
   document: string;
@@ -35,7 +37,12 @@ export type Ledger = {
   items: readonly Item[];
 };
 
-type Context = { document: string; config: LedgerConfig; section: string | undefined };
+type Context = {
+  document: string;
+  config: LedgerConfig;
+  closed: boolean;
+  section: string | undefined;
+};
 
 const toItem = (
   row: TableRow,
@@ -55,6 +62,7 @@ const toItem = (
     id: values.id,
     status,
     open: status !== undefined && context.config.open.includes(status),
+    closed: context.closed,
     values,
     document: context.document,
     section: context.section,
@@ -88,9 +96,12 @@ export const readLedger = (
   document: string,
   config: LedgerConfig,
   headings: readonly Heading[],
+  closed = false,
 ): Ledger => {
   const tables = blocks.flatMap((block) =>
-    parseTables(block.inner).map((table) => toLedgerTable(table, { document, config }, headings)),
+    parseTables(block.inner).map((table) =>
+      toLedgerTable(table, { document, config, closed }, headings),
+    ),
   );
   const items = tables.flatMap((table) =>
     table.rows.flatMap((row) => (row.item ? [row.item] : [])),

@@ -74,7 +74,10 @@ describe("mcp tools", () => {
     const dry = (await call("trove_item", { action: "close", id: "WEB1-3", dryRun: true })).data();
     expect(dry.written).toBe(false);
     expect(dry.files[0]).toMatchObject({ status: "modified", path: "audits/AUDIT_WEB_1.md" });
-    expect(dry.files[0].diff).toHaveLength(3);
+    expect(dry.files[1]).toMatchObject({
+      status: "modified",
+      path: "audits/AUDIT_WEB_1.RESOLVED.md",
+    });
 
     const done = (await call("trove_item", { action: "close", id: "WEB1-3" })).data();
     expect(done.written).toBe(true);

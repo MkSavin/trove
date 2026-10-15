@@ -1,11 +1,6 @@
 import { fieldSpecs } from "../../config/vocabulary.ts";
+import { splitRefs } from "../../document/refs.ts";
 import { defineRule } from "../rule.ts";
-
-const splitRefs = (value: string): string[] =>
-  value
-    .split(",")
-    .map((ref) => ref.trim())
-    .filter(Boolean);
 
 export const headerRefs = defineRule({
   id: "header-refs",

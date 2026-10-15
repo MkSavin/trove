@@ -1,4 +1,5 @@
 [test]
 # git-heavy store tests are slow on Windows runners
 timeout = 30000
+root = "test"
 preload = ["./test/setup.ts"]

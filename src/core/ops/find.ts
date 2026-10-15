@@ -1,3 +1,4 @@
+import type { LedgerConfig } from "../config/schema.ts";
 import type { Document } from "../document/document.ts";
 import type { Item, LedgerRow, LedgerTable } from "../document/ledger.ts";
 import { TroveError } from "../errors.ts";
@@ -5,7 +6,13 @@ import type { StoreIndex } from "../index/index.ts";
 import { findDocument, idToken } from "../index/resolve.ts";
 import { withoutLiveBlocks } from "../live/blocks.ts";
 
-export type LocatedItem = { item: Item; doc: Document; table: LedgerTable; row: LedgerRow };
+export type LocatedItem = {
+  item: Item;
+  doc: Document;
+  ledger: LedgerConfig;
+  table: LedgerTable;
+  row: LedgerRow;
+};
 
 export const requireDocument = (index: StoreIndex, name: string): Document => {
   const doc = findDocument(index, name);
@@ -13,11 +20,15 @@ export const requireDocument = (index: StoreIndex, name: string): Document => {
   return doc;
 };
 
+/** An item still in its ledger; a closed one is refused. */
 export const requireItem = (index: StoreIndex, id: string): LocatedItem => {
   for (const doc of index.documents) {
-    for (const table of doc.ledger?.tables ?? []) {
+    const ledger = doc.ledger;
+    for (const table of ledger?.tables ?? []) {
       const row = table.rows.find((candidate) => candidate.item?.id === id);
-      if (row?.item) return { item: row.item, doc, table, row };
+      if (!row?.item || !ledger) continue;
+      if (row.item.closed) throw new TroveError(`${id} is already closed in ${doc.rel}`);
+      return { item: row.item, doc, ledger: ledger.config, table, row };
     }
   }
   throw new TroveError(`no item ${id} in any ledger`);

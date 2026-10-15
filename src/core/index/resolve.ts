@@ -44,5 +44,18 @@ export const resolveRef = (index: StoreIndex, ref: string): Resolved | undefined
   return { kind: "item", item, document: home, heading: itemHeading(home, item.id) };
 };
 
+/** `WEB1-3. Title` or `` `WEB1-3` — note ``: a heading that starts with the id. */
+const startsWithId = (id: string): RegExp => new RegExp(`^\`?${RegExp.escape(id)}\`?(?![\\w-])`);
+
+/** Sections titled by the id in any document, archive included, when no ledger holds it. */
+export const sectionsTitled = (index: StoreIndex, id: string): Resolved[] => {
+  const pattern = startsWithId(id);
+  return index.documents.flatMap((document) =>
+    document.headings
+      .filter((heading) => pattern.test(heading.title))
+      .map((heading): Resolved => ({ kind: "section", document, heading })),
+  );
+};
+
 export const sectionText = (doc: Document, heading: Heading): string =>
   doc.text.slice(heading.start, heading.end).trimEnd();

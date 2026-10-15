@@ -16,7 +16,7 @@ Built from `purpose` of each type in `trove.yaml`.
 | type | where | what belongs here |
 | -- | -- | -- |
 | `audit` | `audits/AUDIT_` | Findings about existing code, with a ledger of what is left to fix. Not for code that is still to be written: that is a spec or a plan. |
-| `addition` | `audits/AUDIT_` | Working notes of one audit: draft ids, corrections, what was checked and dropped. Carries no open items. |
+| `resolved` | `audits/AUDIT_` | Closed items of one audit with their write-ups, and its working notes: draft ids, corrections, what was checked and dropped. Carries no open items. |
 | `spec` | `specs/SPEC_` | The behaviour to build, as a contract. Archived once fully built; how the system works today is not a spec. |
 | `plan` | `plans/PLAN_` | Work in stages, each with a done-when, including the plan of a process such as a rollout or a migration. |
 | `research` | `research/RESEARCH_` | The report of a finished investigation: the question, what was found, the conclusion or recommendation. An investigation still under way is a study; work to do is a plan. |

@@ -39,9 +39,9 @@ const commitAll = async (root: string, message: string) => {
   await git(root, ["commit", "--quiet", "-m", message]);
 };
 
-const inStore = async (plan: (store: Store) => Plan, message: string) => {
+const inStore = async (plan: (store: Store) => Plan | Promise<Plan>, message: string) => {
   const store = await open();
-  expect((await applyPlan(store, plan(store))).introduced).toEqual([]);
+  expect((await applyPlan(store, await plan(store))).introduced).toEqual([]);
   await commitAll(target, message);
 };
 

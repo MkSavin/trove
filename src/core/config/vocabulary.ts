@@ -44,6 +44,20 @@ export const ledgerOf = (
   type: DocumentTypeConfig | undefined,
 ): LedgerConfig | undefined => type?.ledger ?? config.ledger;
 
+/** The ledger of the type whose closed items this `resolved-of` type receives, status vocabulary swapped for the outcomes. */
+export const closedLedgerOf = (
+  config: Config,
+  type: string | undefined,
+): LedgerConfig | undefined => {
+  const base = Object.values(config.types).find((kind) => kind.closeInto === type);
+  const ledger = ledgerOf(config, base);
+  if (!ledger) return undefined;
+  const columns = ledger.columns.map((column) =>
+    column.key === "status" ? { ...column, enum: ledger.closed } : column,
+  );
+  return { ...ledger, columns, open: [] };
+};
+
 /** Every ledger the store uses: the store's and the ones types bring. */
 export const allLedgers = (config: Config): LedgerConfig[] => [
   ...(config.ledger ? [config.ledger] : []),

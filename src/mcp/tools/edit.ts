@@ -36,6 +36,7 @@ type ItemArgs = {
   commit?: string | undefined;
   archive?: boolean | undefined;
   section?: string | undefined;
+  as?: string | undefined;
 };
 
 const required = <T>(value: T | undefined, what: string): T => {
@@ -43,7 +44,7 @@ const required = <T>(value: T | undefined, what: string): T => {
   return value;
 };
 
-const itemPlan = (index: StoreIndex, args: ItemArgs): Plan => {
+const itemPlan = async (index: StoreIndex, args: ItemArgs): Promise<Plan> => {
   switch (args.action) {
     case "add":
       return addItem(index, {
@@ -52,6 +53,7 @@ const itemPlan = (index: StoreIndex, args: ItemArgs): Plan => {
       });
     case "close":
       return closeItem(index, required(args.id, "id"), {
+        as: args.as,
         commit: args.commit,
         archive: args.archive,
       });
@@ -146,7 +148,7 @@ export const registerEditTools = (server: McpServer, context: Context): void => 
     "trove_item",
     {
       description:
-        "Ledger items. add: document + values by column key (priority, owner, what, …), gets the next id and a section stub; in a ledger with several tables, values.section names the heading of the table.  close: id, optional commit sha; archive=true when it is the audit's last open item. defer: id. move: id + document (the target ledger), section for its table; archive=true when the source is left without open items.",
+        "Ledger items. add: document + values by column key (priority, owner, what, …), gets the next id and a section stub; in a ledger with several tables, values.section names the heading of the table.  close: id, optional commit sha and as (how it was closed: a key of the ledger's closed outcomes, e.g. fixed or dropped; the first by default); a type with closeInto moves the row and section into the audit's resolved companion; archive=true when it is the audit's last open item. defer: id. move: id + document (the target ledger), section for its table; archive=true when the source is left without open items.",
       inputSchema: z.object({
         store: storeField,
         action: z.enum(ITEM_ACTIONS),
@@ -156,13 +158,14 @@ export const registerEditTools = (server: McpServer, context: Context): void => 
         commit: z.string().optional(),
         archive: z.boolean().optional(),
         section: z.string().optional(),
+        as: z.string().optional(),
         dryRun: dryRunField,
       }),
       annotations: EDIT,
     },
     guarded(async ({ store, dryRun, ...args }) => {
       const opened = await openFor(context, store);
-      return runPlanTool(opened, itemPlan(opened.index, args), dryRun);
+      return runPlanTool(opened, await itemPlan(opened.index, args), dryRun);
     }),
   );
 };

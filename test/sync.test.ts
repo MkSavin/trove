@@ -24,9 +24,9 @@ let remote = "";
 
 const open = (root: string): Promise<Store> => openStore({ cwd: root, store: root, today: TODAY });
 
-const run = async (root: string, plan: (store: Store) => Plan) => {
+const run = async (root: string, plan: (store: Store) => Plan | Promise<Plan>) => {
   const store = await open(root);
-  const outcome = await applyPlan(store, plan(store));
+  const outcome = await applyPlan(store, await plan(store));
   expect(outcome.introduced).toEqual([]);
   return syncOutcome(store, outcome);
 };

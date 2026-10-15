@@ -5,7 +5,7 @@ date: 2026-09-28
 checked: 2026-10-10
 scope: "web/ (composer, threads, notifications)"
 slug: WEB1
-addition: AUDIT_WEB_1.ADDITION.md
+resolved: AUDIT_WEB_1.RESOLVED.md
 verify: WEB1-1 retry in `web/src/composer/send.ts`; WEB1-3 `unreadCount` in `web/src/stores/threads.ts`
 ---
 
@@ -13,7 +13,7 @@ verify: WEB1-1 retry in `web/src/composer/send.ts`; WEB1-3 `unreadCount` in `web
 
 **Status:** open. 7 open, 1 deferred; the second pass on 2026-10-10 added WEB1-7 and WEB1-8. Checked 2026-10-10.
 
-Working notes, draft ids and things checked and dropped are in [AUDIT_WEB_1.ADDITION](AUDIT_WEB_1.ADDITION.md).
+Working notes, draft ids and things checked and dropped are in [AUDIT_WEB_1.RESOLVED](AUDIT_WEB_1.RESOLVED.md).
 
 ## Ledger
 

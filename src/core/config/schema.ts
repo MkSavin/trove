@@ -8,7 +8,7 @@ export const CAPABILITIES = [
   "series",
   "versions",
   "prompt-body",
-  "addition-of",
+  "resolved-of",
   "status-line",
   "freshness",
   "generated",
@@ -49,6 +49,15 @@ const ledgerColumn = z.strictObject({
   enum: enumeration.optional(),
 });
 
+const PLACEHOLDER = /\{\w+\}/;
+
+const closedOutcomes = z
+  .union([z.string(), z.record(z.string(), z.string())])
+  .transform((value) => (typeof value === "string" ? { closed: value } : value))
+  .refine((outcomes) => !Object.values(outcomes).some((label) => PLACEHOLDER.test(label)), {
+    message: "closed labels take no placeholders: put {date} and {commit} into note",
+  });
+
 const ledger = z.strictObject({
   marker: z.string().default("ledger"),
   /** `{field}` reads the document header, `{section}` the table's code in `sections`, `{n}` counts. */
@@ -58,8 +67,14 @@ const ledger = z.strictObject({
   columns: z.array(ledgerColumn).min(1),
   /** Item status keys that keep a document out of the archive. */
   open: z.array(z.string()).default(["open"]),
-  /** Written into the heading of a closed item; may hold `{date}` and `{commit}`. */
-  closed: z.string().default("closed"),
+  /** Ways an item gets closed, key → label, e.g. `{ fixed: fixed, dropped: dropped }`; the first is the default. */
+  closed: closedOutcomes.default({ closed: "closed" }),
+  /** Heading note of a closed item; `{status}` is the outcome label, `{date}` and `{commit}` optional. */
+  note: z.string().default("{status}, {commit}"),
+  /** Heading of a new item's section; `{status}` and any column key. */
+  heading: z.string().default("{id}. {what} ({status})"),
+  /** Lines put under a new item's heading, with the same placeholders. */
+  stub: z.string().optional(),
 });
 
 const documentType = z.strictObject({
@@ -74,6 +89,8 @@ const documentType = z.strictObject({
   freshness: z.int().positive().optional(),
   /** Its own ledger columns and statuses, e.g. for a debt list; the store's ledger otherwise. */
   ledger: ledger.optional(),
+  /** A `resolved-of` type: `item close` moves closed items into this document's companion of it. */
+  closeInto: z.string().optional(),
 });
 
 const lifecycleStep = z.strictObject({
@@ -160,6 +177,7 @@ export const configSchema = z.strictObject({
       statusLine: z.string().default("Status"),
       checked: z.string().default("Checked"),
       ledger: z.string().default("Ledger"),
+      closedLedger: z.string().default("Closed items"),
       count: z.string().default("count"),
       summaryCounts: z.string().default("By priority"),
       summaryItems: z.string().default("Open items"),
@@ -169,6 +187,7 @@ export const configSchema = z.strictObject({
       statusLine: "Status",
       checked: "Checked",
       ledger: "Ledger",
+      closedLedger: "Closed items",
       count: "count",
       summaryCounts: "By priority",
       summaryItems: "Open items",

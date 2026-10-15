@@ -6,7 +6,7 @@ sync: off
 roots: {}
 
 folders:
-  audits: { prefix: AUDIT_, types: [audit, addition] }
+  audits: { prefix: AUDIT_, types: [audit, resolved] }
   specs: { prefix: SPEC_, types: [spec] }
   plans: { prefix: PLAN_, types: [plan] }
   research: { prefix: [RESEARCH_, INCIDENT_, STUDY_], types: [research, incident, study] }
@@ -36,12 +36,13 @@ types:
   audit:
     purpose: "Findings about existing code, with a ledger of what is left to fix. Not for code that is still to be written: that is a spec or a plan."
     capabilities: [ledger, series, status-line, freshness]
+    closeInto: resolved
     fields:
       slug: required
-      addition: { format: refs }
-  addition:
-    purpose: "Working notes of one audit: draft ids, corrections, what was checked and dropped. Carries no open items."
-    capabilities: [addition-of, status-line, freshness]
+      resolved: { format: refs }
+  resolved:
+    purpose: "Closed items of one audit with their write-ups, and its working notes: draft ids, corrections, what was checked and dropped. Carries no open items."
+    capabilities: [resolved-of, status-line, freshness]
     initial: current
     fields:
       base: { required: true, format: refs }
@@ -76,6 +77,8 @@ ledger:
     - { key: owner, label: owner, required: true }
     - { key: status, label: status, required: true, enum: [open, deferred] }
     - { key: what, label: what is left, required: true }
+  closed: { fixed: fixed, dropped: dropped, moved: moved }
+  note: "{status} {date}, {commit}"
 
 lifecycle:
   audit:

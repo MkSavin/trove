@@ -2,6 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { cp, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { withHeadingNote } from "../src/core/edit/heading.ts";
+import { excerpts } from "../src/core/index/excerpt.ts";
+import { selectItems } from "../src/core/index/query.ts";
 import { applyPlan } from "../src/core/ops/apply.ts";
 import { archivePlan } from "../src/core/ops/doc-archive.ts";
 import { newDocument } from "../src/core/ops/doc-new.ts";
@@ -11,7 +14,7 @@ import { addItem } from "../src/core/ops/item-add.ts";
 import { closedNote, closeItem } from "../src/core/ops/item-close.ts";
 import { deferItem } from "../src/core/ops/item-defer.ts";
 import type { Plan } from "../src/core/ops/plan.ts";
-import { lineDiff } from "../src/core/text/diff.ts";
+import { renderNewDocument } from "../src/core/templates/new-document.ts";
 import { openStore, runRules, type Store } from "../src/index.ts";
 import { ROOT, TODAY } from "./helpers.ts";
 
@@ -27,8 +30,8 @@ const sandbox = async (): Promise<Store> => {
 const read = (store: Store, rel: string) => Bun.file(join(store.root, rel)).text();
 const reopen = (store: Store) => openStore({ cwd: store.root, store: store.root, today: TODAY });
 
-const apply = async (store: Store, plan: Plan) => {
-  const outcome = await applyPlan(store, plan);
+const apply = async (store: Store, plan: Plan | Promise<Plan>) => {
+  const outcome = await applyPlan(store, await plan);
   expect(outcome.introduced).toEqual([]);
   return outcome;
 };
@@ -40,57 +43,119 @@ afterEach(async () => {
 });
 
 describe("closed note", () => {
-  test("fills date and commit, and drops the commit part without one", () => {
-    expect(closedNote("closed", "2026-10-15", "abc")).toBe("closed, abc");
-    expect(closedNote("закрыто {date}, `{commit}`", "2026-10-15", "abc")).toBe(
+  test("fills status, date and commit, and drops the commit part without one", () => {
+    const values = { status: "closed", date: "2026-10-15", commit: "abc" };
+    expect(closedNote("{status}, {commit}", values)).toBe("closed, abc");
+    expect(closedNote("{status} {date}, `{commit}`", { ...values, status: "закрыто" })).toBe(
       "закрыто 2026-10-15, `abc`",
     );
-    expect(closedNote("закрыто {date}, `{commit}`", "2026-10-15", undefined)).toBe(
-      "закрыто 2026-10-15",
+    expect(closedNote("{status} {date}, `{commit}`", { ...values, commit: undefined })).toBe(
+      "closed 2026-10-15",
+    );
+  });
+
+  test("replaces only a note trove wrote; a parenthesis of the title stays", async () => {
+    const ledger = (await sandbox()).config.ledger;
+    if (!ledger) throw new Error("the sandbox has a ledger");
+    const close = (title: string) => withHeadingNote(title, "fixed 2026-10-15", ledger);
+    expect(close("### X-1. Ollama (local)")).toBe("### X-1. Ollama (local) (fixed 2026-10-15)");
+    expect(close("### X-1. Ollama (open)")).toBe("### X-1. Ollama (fixed 2026-10-15)");
+    expect(close("### X-1. Ollama (deferred)")).toBe("### X-1. Ollama (fixed 2026-10-15)");
+    expect(close("### X-1. Ollama")).toBe("### X-1. Ollama (fixed 2026-10-15)");
+    expect(withHeadingNote("### X-1. Ollama (local)", "deferred", ledger)).toBe(
+      "### X-1. Ollama (local) (deferred)",
+    );
+    expect(withHeadingNote("### X-1. Ollama (open)", "deferred", ledger)).toBe(
+      "### X-1. Ollama (deferred)",
     );
   });
 });
 
 describe("item close", () => {
-  test("touches only the ledger row and the item's heading", async () => {
+  test("moves the row and the section into the resolved companion's closed ledger", async () => {
     const store = await sandbox();
-    const before = await read(store, "audits/AUDIT_WEB_1.md");
-    await apply(store, closeItem(store.index, "WEB1-3", { commit: "a1b2c3d" }));
-    const diff = lineDiff(before, await read(store, "audits/AUDIT_WEB_1.md"));
-    expect(diff.map((line) => `${line.kind}${line.text}`)).toEqual([
-      "-| WEB1-3 | P2 | threads | web | open | Unread counter drifts after a reconnect: deltas are applied twice |",
-      "-### WEB1-3. Unread counter drifts after a reconnect (open)",
-      "+### WEB1-3. Unread counter drifts after a reconnect (closed, a1b2c3d)",
+    await apply(store, closeItem(store.index, "WEB1-3", { as: "fixed", commit: "a1b2c3d" }));
+    const base = await read(store, "audits/AUDIT_WEB_1.md");
+    expect(base).not.toContain("| WEB1-3 |");
+    expect(base).not.toContain("### WEB1-3.");
+
+    const companion = await read(store, "audits/AUDIT_WEB_1.RESOLVED.md");
+    expect(companion).toContain(
+      [
+        "## Closed items",
+        "",
+        "<!-- ledger -->",
+        "### Web",
+        "",
+        "| id | P | module | owner | status | what is left |",
+        "| -- | - | ------ | ----- | ------ | ------------ |",
+        "| WEB1-3 | P2 | threads | web | fixed | Unread counter drifts after a reconnect: deltas are applied twice |",
+        "<!-- /ledger -->",
+      ].join("\n"),
+    );
+    expect(companion).toContain(
+      `### WEB1-3. Unread counter drifts after a reconnect (fixed ${TODAY}, a1b2c3d)\n\nThe reconnect handler`,
+    );
+
+    const next = await reopen(store);
+    expect(excerpts(next.index, "WEB1-3")[0]?.file).toBe("audits/AUDIT_WEB_1.RESOLVED.md");
+    await expect(closeItem(next.index, "WEB1-3")).rejects.toThrow(/WEB1-3 is already closed/);
+    expect(selectItems(next.index, {}).map((item) => item.id)).not.toContain("WEB1-3");
+    expect(selectItems(next.index, { state: ["closed"] }).map((item) => item.id)).toEqual([
+      "WEB1-3",
     ]);
   });
 
-  test("rebuilds the backlog and points at other mentions", async () => {
+  test("rebuilds the backlog and names where the item went", async () => {
     const store = await sandbox();
     const outcome = await apply(store, closeItem(store.index, "WEB1-3"));
     expect(outcome.changes.map((change) => change.rel)).toEqual([
       "audits/AUDIT_WEB_1.md",
+      "audits/AUDIT_WEB_1.RESOLVED.md",
       "BACKLOG.md",
       "summaries/SUMMARY_WEB.md",
     ]);
-    expect(outcome.notes).toEqual(["WEB1-3 is still mentioned in audits/AUDIT_WEB_1.ADDITION.md"]);
+    expect(outcome.notes).toEqual(["WEB1-3 → audits/AUDIT_WEB_1.RESOLVED.md"]);
     expect(await read(store, "BACKLOG.md")).not.toContain("| WEB1-3 |");
   });
 
-  test("refuses to leave an audit without open items in the work folders", async () => {
+  test("creates the companion when there is none, linked both ways, and archives it with the audit", async () => {
     const store = await sandbox();
-    await apply(store, closeItem(store.index, "MOB1-1"));
+    await apply(store, closeItem(store.index, "MOB1-1", { as: "dropped" }));
+    const companion = await read(store, "audits/mobile/AUDIT_MOBILE_1.RESOLVED.md");
+    expect(companion).toContain("\nbase: AUDIT_MOBILE_1.md\n");
+    expect(companion).toContain(
+      `Checked ${TODAY}.\n\n[AUDIT_MOBILE_1](AUDIT_MOBILE_1.md)\n\n## Closed items`,
+    );
+    expect(companion).toContain("| MOB1-1 |");
+    expect(companion).toContain("| dropped |");
+    expect(await read(store, "audits/mobile/AUDIT_MOBILE_1.md")).toContain(
+      "resolved: AUDIT_MOBILE_1.RESOLVED.md\n",
+    );
+
     const next = await reopen(store);
-    const refused = await applyPlan(next, closeItem(next.index, "MOB1-2"));
+    const refused = await applyPlan(next, await closeItem(next.index, "MOB1-2"));
     expect(refused.written).toBe(false);
     expect(refused.introduced.map((d) => d.rule)).toEqual(["lifecycle"]);
 
     await apply(next, closeItem(next.index, "MOB1-2", { archive: true }));
-    expect(
-      await Bun.file(join(store.root, ".archive/audits/mobile/AUDIT_MOBILE_1.md")).exists(),
-    ).toBe(true);
+    const archived = (rel: string) => Bun.file(join(store.root, ".archive", rel)).exists();
+    expect(await archived("audits/mobile/AUDIT_MOBILE_1.md")).toBe(true);
+    expect(await archived("audits/mobile/AUDIT_MOBILE_1.RESOLVED.md")).toBe(true);
     expect(await Bun.file(join(store.root, "audits/mobile/AUDIT_MOBILE_1.md")).exists()).toBe(
       false,
     );
+  });
+
+  test("a type without closeInto keeps the section, its heading marked", async () => {
+    const store = await sandbox();
+    await expect(closeItem(store.index, "DEBT-S1", { as: "fixed" })).rejects.toThrow(
+      /no closing outcome fixed; known: closed/,
+    );
+    await apply(store, closeItem(store.index, "DEBT-S1", { commit: "a1b2c3d" }));
+    const text = await read(store, "DEBT.md");
+    expect(text).not.toContain("| DEBT-S1 |");
+    expect(text).toContain("### DEBT-S1. Presence fan-out per team (done, a1b2c3d)");
   });
 
   test("keeps CRLF line breaks", async () => {
@@ -247,5 +312,96 @@ describe("doc operations", () => {
     expect(outcome.written).toBe(false);
     expect(outcome.changes[0]?.previous).toBe(before);
     expect(await read(store, "RISKS.md")).toBe(before);
+  });
+});
+
+describe("sections, headers and lookups", () => {
+  test("ledger.heading and ledger.stub shape a new item's section, which then defers", async () => {
+    const store = await sandbox();
+    const config = await read(store, "trove.yaml");
+    await Bun.write(
+      join(store.root, "trove.yaml"),
+      config.replace(
+        /^ {2}note: .*$/m,
+        '$&\n  heading: "{id}. {what}"\n  stub: "**Owner.** {owner}\\n\\n**Fix.**"',
+      ),
+    );
+    const shaped = await reopen(store);
+    await apply(
+      shaped,
+      addItem(shaped.index, {
+        document: "AUDIT_API_2",
+        values: { priority: "P1", owner: "api", what: "Session cookies lack SameSite" },
+      }),
+    );
+    const added = await read(store, "audits/AUDIT_API_2.md");
+    expect(
+      added.endsWith("## API2-5. Session cookies lack SameSite\n\n**Owner.** api\n\n**Fix.**\n"),
+    ).toBe(true);
+    const next = await reopen(store);
+    await apply(next, deferItem(next.index, "API2-5"));
+    expect(await read(store, "audits/AUDIT_API_2.md")).toContain(
+      "## API2-5. Session cookies lack SameSite (deferred)\n",
+    );
+  });
+
+  test("double-quoted header values escape backslashes and quotes", async () => {
+    const store = await sandbox();
+    const value = 'trove: D:\\Dev\\trove "x"';
+    await apply(store, setDocumentField(store.index, "RISKS", "scope", value));
+    const text = await read(store, "RISKS.md");
+    expect(text).toContain('scope: "trove: D:\\\\Dev\\\\trove \\"x\\""\n');
+    expect(requireDocument((await reopen(store)).index, "RISKS").meta.scope).toBe(value);
+    const header = text.split("---\n")[1] ?? "";
+    expect((Bun.YAML.parse(header) as { scope: string }).scope).toBe(value);
+  });
+
+  test("show finds every section titled by an id no ledger holds", async () => {
+    const store = await sandbox();
+    const rel = "audits/AUDIT_WEB_1.RESOLVED.md";
+    await Bun.write(
+      join(store.root, rel),
+      `${await read(store, rel)}\n### WEB1-99. Old fix (fixed)\n\nIt was fixed.\n`,
+    );
+    const archived = ".archive/audits/AUDIT_WEB_0.md";
+    await Bun.write(
+      join(store.root, archived),
+      "---\ntype: research\nstatus: archived\ndate: 2026-01-01\nchecked: 2026-01-01\nscope: x\n---\n\n# Old\n\n## `WEB1-99` — still noted\n\nText.\n",
+    );
+    const found = excerpts((await reopen(store)).index, "WEB1-99");
+    expect(found.map((excerpt) => excerpt.file)).toEqual([archived, rel]);
+    expect(found[1]?.text).toBe("### WEB1-99. Old fix (fixed)\n\nIt was fixed.");
+    expect(() => excerpts(store.index, "WEB1-98")).toThrow(/nothing matches WEB1-98/);
+  });
+
+  test("a new document carries a status line only when its type has the capability", async () => {
+    const store = await sandbox();
+    const plan = store.config.types.plan;
+    if (!plan) throw new Error("the sandbox has plans");
+    const input = {
+      type: "plan",
+      name: "PLAN_X",
+      title: "x",
+      status: "open",
+      date: TODAY,
+      fields: [],
+    };
+    expect(renderNewDocument(store.config, input)).toContain("**Status:** open.");
+    const bare = {
+      ...store.config,
+      types: { ...store.config.types, plan: { ...plan, capabilities: [] } },
+    };
+    expect(renderNewDocument(bare, input)).not.toContain("**Status:**");
+  });
+
+  test("id-format names a header field the ids need and the document lacks", async () => {
+    const store = await sandbox();
+    const rel = "audits/AUDIT_API_2.md";
+    await Bun.write(join(store.root, rel), (await read(store, rel)).replace("slug: API2\n", ""));
+    const next = await reopen(store);
+    const messages = runRules(next.rules, next.index)
+      .filter((d) => d.rule === "id-format")
+      .map((d) => d.message);
+    expect(messages).toEqual([`ids follow {slug}-{n}, but ${rel} has no slug`]);
   });
 });
