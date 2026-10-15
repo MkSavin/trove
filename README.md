@@ -79,7 +79,7 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 
 | command | does |
 | ------- | ---- |
-| `trove doc new <type> <topic> [--scope] [--field k=v]` | A document from the type's template: folder, prefix, next series number, slug. |
+| `trove doc new <type> <topic> [--scope] [--field k=v]` | A document from the type's template: folder, prefix, next series number, slug. The name is the topic's first eight words in capitals, Cyrillic transliterated (`чего не хватает` → `CHEGO_NE_KHVATAET`); other scripts need `--name`. |
 | `trove doc archive <doc>` | Move into the archive mirror, set the status, fix relative links on both sides. |
 | `trove doc retype <doc> <type>` | Turn a document into another type, e.g. research that became a plan of work: folder, prefix, status, title, links and references follow. |
 | `trove summary new <kind> [filters] [--name]` | A dated summary document of that kind: its generated blocks filled, `<!-- write: … -->` places left for the analysis. |

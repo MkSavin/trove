@@ -3,14 +3,16 @@ import type { Config } from "../config/schema.ts";
 import { hasCapability } from "../config/vocabulary.ts";
 import { TroveError } from "../errors.ts";
 import type { StoreIndex } from "../index/index.ts";
+import { transliterate } from "../text/transliterate.ts";
 
 export type Placement = { folder: string | undefined; prefix: string };
 
 const WORD = /[A-Z0-9]+/g;
+const MAX_WORDS = 8;
 
-/** `web client` → `WEB_CLIENT`; non-Latin topics need an explicit name. */
+/** `web client` → `WEB_CLIENT`, Cyrillic transliterated; other scripts need an explicit name. */
 export const nameBase = (topic: string): string => {
-  const base = (topic.toUpperCase().match(WORD) ?? []).join("_");
+  const base = (transliterate(topic).match(WORD) ?? []).slice(0, MAX_WORDS).join("_");
   if (!base) throw new TroveError(`cannot build a file name from "${topic}": pass --name`);
   return base;
 };

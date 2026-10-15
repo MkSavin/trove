@@ -1,0 +1,46 @@
+const CYRILLIC: Readonly<Record<string, string>> = {
+  А: "A",
+  Б: "B",
+  В: "V",
+  Г: "G",
+  Ґ: "G",
+  Д: "D",
+  Е: "E",
+  Ё: "E",
+  Є: "YE",
+  Ж: "ZH",
+  З: "Z",
+  И: "I",
+  І: "I",
+  Ї: "YI",
+  Й: "Y",
+  К: "K",
+  Л: "L",
+  М: "M",
+  Н: "N",
+  О: "O",
+  П: "P",
+  Р: "R",
+  С: "S",
+  Т: "T",
+  У: "U",
+  Ў: "U",
+  Ф: "F",
+  Х: "KH",
+  Ц: "TS",
+  Ч: "CH",
+  Ш: "SH",
+  Щ: "SHCH",
+  Ъ: "",
+  Ы: "Y",
+  Ь: "",
+  Э: "E",
+  Ю: "YU",
+  Я: "YA",
+};
+
+const LETTER = /[Ѐ-ӿ]/gu;
+
+/** Russian, Ukrainian and Belarusian letters in Latin capitals: `Чего` → `CHEGO`. */
+export const transliterate = (text: string): string =>
+  text.toUpperCase().replace(LETTER, (letter) => CYRILLIC[letter] ?? letter);
