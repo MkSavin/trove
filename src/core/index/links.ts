@@ -45,7 +45,7 @@ const treeAt = (index: StoreIndex, dir: string, ref: string): ReadonlySet<string
   const key = `${dir}\0${ref}`;
   if (!cache.has(key)) {
     const args = ["git", "-C", dir, "ls-tree", "-r", "-t", "-z", "--name-only", ref];
-    const listed = Bun.spawnSync(args);
+    const listed = Bun.spawnSync(args, { env: process.env });
     cache.set(
       key,
       listed.exitCode === 0
