@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { Document } from "../document/document.ts";
 import { resolveFrom } from "../edit/links.ts";
+import { gitEnv } from "../git/git.ts";
 import type { Link } from "../markdown/links.ts";
 import type { StoreIndex } from "./index.ts";
 
@@ -48,7 +49,7 @@ const treeAt = (index: StoreIndex, dir: string, ref: string): ReadonlySet<string
   const key = `${dir}\0${ref}`;
   if (!cache.has(key)) {
     const args = ["git", "-C", dir, "ls-tree", "-r", "-t", "-z", "--name-only", ref];
-    const listed = Bun.spawnSync(args, { env: process.env });
+    const listed = Bun.spawnSync(args, { env: gitEnv() });
     cache.set(
       key,
       listed.exitCode === 0
@@ -59,11 +60,17 @@ const treeAt = (index: StoreIndex, dir: string, ref: string): ReadonlySet<string
   return cache.get(key);
 };
 
+/** Files git ignores, such as installed packages, are never in a commit: they are read from the checkout. */
+const ignoredInCheckout = (dir: string, absolute: string): boolean =>
+  existsSync(absolute) &&
+  Bun.spawnSync(["git", "-C", dir, "check-ignore", "-q", absolute], { env: gitEnv() }).exitCode ===
+    0;
+
 const stateAt = (index: StoreIndex, root: CodeRoot, absolute: string, ref: string): LinkState => {
   const tree = treeAt(index, root.dir, ref);
   if (!tree) return "unchecked";
   const path = relative(root.dir, absolute).split(sep).join("/");
-  return path === "" || tree.has(path) ? "ok" : "dead";
+  return path === "" || tree.has(path) || ignoredInCheckout(root.dir, absolute) ? "ok" : "dead";
 };
 
 const codeState = (

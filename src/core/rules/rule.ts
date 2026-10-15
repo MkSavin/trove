@@ -13,7 +13,8 @@ export type RuleContext = { index: StoreIndex; config: Config };
 type RuleBase = {
   /** Kebab-case; the key under `rules:` in the store config. */
   id: string;
-  level: Level;
+  /** `off` for a rule a store opts into. */
+  level: Severity;
   summary: string;
 };
 

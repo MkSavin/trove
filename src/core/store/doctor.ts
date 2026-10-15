@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { CONFIG_FILE } from "../config/load.ts";
 import { git, toplevel } from "../git/git.ts";
 import { runRules } from "../rules/run.ts";
+import { isInside, samePath } from "../text/real-path.ts";
 import { findUp } from "./locate.ts";
 import { openStore } from "./open.ts";
 import { entryRoot, POINTER_FILE, readPointer } from "./pointer.ts";
-import { findProject } from "./registry.ts";
+import { findProject, readRegistry } from "./registry.ts";
 
 export type StoreHealth = {
   name: string;
@@ -54,9 +55,28 @@ const inspect = async (name: string, root: string): Promise<StoreHealth> => {
   }
 };
 
+/** Inside a store with no pointer above: the project the registry ties it to, else the store alone. */
+const fromStore = async (store: string): Promise<Health> => {
+  const project = (await readRegistry()).projects.find((entry) =>
+    entry.stores.some((candidate) => samePath(candidate.path, store)),
+  );
+  const entries = project?.stores.map((entry) => ({ name: entry.name, root: entry.path })) ?? [
+    { name: basename(store), root: store },
+  ];
+  return {
+    project: project?.root ?? store,
+    pointer: false,
+    registered: project !== undefined,
+    stores: await Promise.all(entries.map((entry) => inspect(entry.name, entry.root))),
+  };
+};
+
 /** Everything `trove doctor` prints, gathered without changing anything. */
 export const diagnose = async (cwd: string): Promise<Health> => {
-  const project = findUp(cwd, POINTER_FILE) ?? (await toplevel(cwd)) ?? cwd;
+  const store = findUp(cwd, CONFIG_FILE);
+  const pointed = findUp(cwd, POINTER_FILE);
+  if (store && (!pointed || isInside(store, pointed))) return fromStore(store);
+  const project = pointed ?? (await toplevel(cwd)) ?? cwd;
   const pointer = await readPointer(project);
   const registered = await findProject(project);
   const entries = pointer

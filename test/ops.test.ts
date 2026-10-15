@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { withHeadingNote } from "../src/core/edit/heading.ts";
 import { excerpts } from "../src/core/index/excerpt.ts";
 import { selectItems } from "../src/core/index/query.ts";
+import { isSnapshot } from "../src/core/live/snapshot.ts";
 import { applyPlan } from "../src/core/ops/apply.ts";
 import { archivePlan } from "../src/core/ops/doc-archive.ts";
 import { newDocument } from "../src/core/ops/doc-new.ts";
@@ -439,5 +440,33 @@ describe("sections, headers and lookups", () => {
       .filter((d) => d.rule === "id-format")
       .map((d) => d.message);
     expect(messages).toEqual([`ids follow {slug}-{n}, but ${rel} has no slug`]);
+  });
+
+  test("item-size, once turned on, reports sections over the limit", async () => {
+    const store = await sandbox();
+    const quiet = runRules(store.rules, store.index).filter((d) => d.rule === "item-size");
+    expect(quiet).toEqual([]);
+    const config = await read(store, "trove.yaml");
+    await Bun.write(
+      join(store.root, "trove.yaml"),
+      `${config}\nrules:\n  item-size: { level: warn, limit: 300 }\n`.replace(
+        /\nrules: \{\}\r?\n/,
+        "\n",
+      ),
+    );
+    const sized = await reopen(store);
+    const found = runRules(sized.rules, sized.index).filter((d) => d.rule === "item-size");
+    expect(found.length).toBeGreaterThan(0);
+    expect(found[0]?.severity).toBe("warn");
+    expect(found[0]?.message).toMatch(/takes \d+ bytes, over 300/);
+  });
+
+  test("a summary keeps its blocks as a snapshot once its date has passed", async () => {
+    const later = await openStore({ cwd: ROOT, store: join(ROOT, "sandbox"), today: "2099-01-01" });
+    const summary = requireDocument(later.index, "SUMMARY_WEB");
+    expect(isSnapshot(summary, later.index)).toBe(true);
+    const same = await openStore({ cwd: ROOT, store: join(ROOT, "sandbox"), today: TODAY });
+    expect(isSnapshot(requireDocument(same.index, "SUMMARY_WEB"), same.index)).toBe(false);
+    expect(isSnapshot(requireDocument(later.index, "AUDIT_WEB_1"), later.index)).toBe(false);
   });
 });

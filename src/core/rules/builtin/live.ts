@@ -1,4 +1,5 @@
 import { fillLiveBlocks } from "../../live/fill.ts";
+import { isSnapshot } from "../../live/snapshot.ts";
 import { defineRule } from "../rule.ts";
 
 export const liveBlock = defineRule({
@@ -21,7 +22,7 @@ export const liveBlockStale = defineRule({
     "Generated blocks match the store; edits inside them are overwritten by the next report.",
   scope: "document",
   check: (doc, { index }) =>
-    doc.place === "archive" || fillLiveBlocks(doc.text, doc.rel, index).text === doc.text
+    isSnapshot(doc, index) || fillLiveBlocks(doc.text, doc.rel, index).text === doc.text
       ? []
       : [{ line: 1, message: "generated blocks are out of date: run trove report" }],
 });

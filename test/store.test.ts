@@ -111,6 +111,22 @@ describe("locating a store", () => {
     expect(await forgetProject(app)).toBe(true);
     expect(await locateStore(app)).toBeUndefined();
   });
+
+  test("doctor inside a store finds it and the project the registry ties it to", async () => {
+    const app = await project("app");
+    const { store } = await initStore({ cwd: app, language: "en", git: false });
+    await rm(join(app, ".trove.yaml"));
+    const health = await diagnose(join(store, "audits"));
+    expect(samePath(health.project, app)).toBe(true);
+    expect(health.registered).toBe(true);
+    expect(health.stores).toHaveLength(1);
+    expect(health.stores[0]).toMatchObject({ present: true, errors: 0 });
+
+    await forgetProject(app);
+    const alone = await diagnose(store);
+    expect(alone.registered).toBe(false);
+    expect(samePath(alone.stores[0]?.root ?? "", store)).toBe(true);
+  });
 });
 
 describe("clone", () => {

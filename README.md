@@ -60,7 +60,7 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 | `trove store add <name> --scope <glob>` | Another store for a team with its own access; commands run under `--scope` folders go to it. |
 | `trove remote add <url>` | Connect a local store to a remote repository, switch `sync` to `push` and push the history. |
 | `trove client add <claude\|cursor\|codex> [--local]` | Register the MCP server and the skills for an assistant in this project; `--local` keeps them on this machine and out of the project (Claude Code). |
-| `trove doctor` · `trove forget` | Show the project, its stores and their health · drop the project from this machine's registry. |
+| `trove doctor` · `trove forget` | Show the project, its stores and their health; inside a store, that store and the project the registry ties it to · drop the project from this machine's registry. |
 
 **Read**
 
@@ -72,7 +72,7 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 | `trove show WEB1-4` | Print one item's section, a closed one too; when no ledger holds the id, every section titled by it, archive included. Also takes `DOC#heading`, or a document name for its outline. |
 | `trove prompt PROMPT_X [--copy]` | Print a prompt's task text, or copy it; Cyrillic survives on Windows too. |
 | `trove report [name...]` · `trove rules` | Rebuild generated documents · list rules with their effective level. |
-| `trove links [--dead]` | Relative links to documents and code; code is checked under `roots` present on this machine, in the checkout or, with `{ path, ref: origin/main }`, at that commit whatever branch is checked out. `--dead` ends with `N dead of M links`. |
+| `trove links [--dead]` | Relative links to documents and code; code is checked under `roots` present on this machine, in the checkout or, with `{ path, ref: origin/main }`, at that commit whatever branch is checked out; files git ignores there, such as installed packages, are read from the checkout. `--dead` ends with `N dead of M links`. |
 | `trove export items [filters] --format csv\|json [--columns a,b]` | Rows for a CRM or a spreadsheet; RFC 4180 CSV. |
 
 **Edit.** Every edit patches only its own lines, keeps CRLF, is checked in memory first and is not written if it adds an error. Generated reports are rebuilt in the same step; `--dry-run` prints the line diff instead.
@@ -157,7 +157,7 @@ The skills, `trove-store` and `trove-migrate`, live once in [`plugin/skills`](pl
 <!-- /trove:items -->
 ```
 
-Views are `items`, `documents`, `counts` (`by=priority`) and `placement`; `as=table|list|ids`, `columns` (`document:audit` relabels one), `label` (the first column of `counts`), `group`, `sort` and `format="{id} — {what}"` lay them out, every other option is a filter. A `filter:` header field adds to every block of the document. Every edit and report run refills the blocks; archived documents keep theirs as a snapshot, and a rebase conflict inside a block settles itself.
+Views are `items`, `documents`, `counts` (`by=priority`) and `placement`; `as=table|list|ids`, `columns` (`document:audit` relabels one), `label` (the first column of `counts`), `group`, `sort` and `format="{id} — {what}"` lay them out, every other option is a filter. A `filter:` header field adds to every block of the document. Every edit and report run refills the blocks; archived documents keep theirs as a snapshot, and so does a summary once its `date` has passed: it is a look at that day, and a new one is `trove summary new`. A rebase conflict inside a block settles itself.
 
 **Report.** A query plus a layout. `BACKLOG.md` is the open items grouped by owner; a prompts index is the prompt documents sorted by path.
 
@@ -241,6 +241,7 @@ A template is the body after the status line: Markdown, generated blocks and wri
 | `id-format` | error | ids follow `ledger.id` |
 | `item-enum` | error | cells with a vocabulary hold one of its values |
 | `duplicate-id` | error | ids are unique across the store |
+| `item-size` | off | an item's section stays within `limit` bytes, 2048 by default: `item-size: { level: warn, limit: 2048, since: 2026-10-15 }` |
 | `prompt-body` | error | prompts carry the `<!-- prompt -->` marker |
 | `header-refs` | error | `refs` fields name existing documents |
 | `folder-type` | warn | documents match their folder's types and prefixes |
@@ -250,7 +251,7 @@ A template is the body after the status line: Markdown, generated blocks and wri
 | `write-place` | warn | places left for written analysis, `<!-- write: … -->`, are written up |
 | `stale` | info | work documents are re-checked within the freshness limit |
 
-Each rule can be turned `off` or given another level, and `since` applies it only to documents dated on or after that day.
+Each rule can be turned `off` or given another level, `since` applies it only to documents dated on or after that day, and `limit` sets what a measuring rule measures against.
 
 ### Custom rules
 

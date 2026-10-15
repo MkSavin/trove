@@ -2,6 +2,7 @@ import { join } from "node:path";
 import type { Config } from "../config/schema.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { fillLiveBlocks } from "../live/fill.ts";
+import { isSnapshot } from "../live/snapshot.ts";
 import { placementTable } from "../regulation/regulation.ts";
 import type { PlannedReport } from "./write.ts";
 
@@ -33,7 +34,7 @@ const plan = (output: string, previous: string, index: StoreIndex): PlannedRepor
   return { name: `blocks in ${output}`, output, rows: 0, changed: text !== previous, text };
 };
 
-/** Files whose generated blocks are out of date; archived documents keep theirs as a snapshot. */
+/** Files whose generated blocks are out of date; snapshots keep theirs. */
 export const planEmbeds = async (index: StoreIndex): Promise<PlannedReport[]> => {
   const outside = index.config.regulationFiles.filter((rel) => !index.byRel.has(rel));
   const files = await Promise.all(
@@ -43,7 +44,7 @@ export const planEmbeds = async (index: StoreIndex): Promise<PlannedReport[]> =>
     }),
   );
   const documents = index.documents
-    .filter((doc) => doc.place === "work")
+    .filter((doc) => !isSnapshot(doc, index))
     .map((doc) => plan(doc.rel, doc.text, index));
   return [...files, ...documents].filter((entry): entry is PlannedReport => entry !== undefined);
 };

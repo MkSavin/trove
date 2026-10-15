@@ -10,13 +10,23 @@ export type GitOptions = {
   env?: Readonly<Record<string, string>>;
 };
 
+const HOOK_VARIABLES = new Set(["GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE", "GIT_PREFIX"]);
+
+/** The environment without the variables a git hook sets, which would steer every repository to the hook's. */
+export const gitEnv = (): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] => entry[1] !== undefined && !HOOK_VARIABLES.has(entry[0]),
+    ),
+  );
+
 export const git = async (
   cwd: string,
   args: readonly string[],
   { raw = false, env }: GitOptions = {},
 ): Promise<GitResult> => {
   const command = Bun.$`git ${args}`.cwd(cwd).quiet().nothrow();
-  const result = await (env ? command.env({ ...process.env, ...env }) : command);
+  const result = await command.env({ ...gitEnv(), ...env });
   const out = result.stdout.toString();
   return {
     ok: result.exitCode === 0,

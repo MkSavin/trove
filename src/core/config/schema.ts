@@ -102,8 +102,13 @@ const lifecycleStep = z.strictObject({
 });
 
 const ruleSetting = z.union([
-  severity.transform((level) => ({ level, since: undefined })),
-  z.strictObject({ level: severity, since: z.iso.date().optional() }),
+  severity.transform((level) => ({ level, since: undefined, limit: undefined })),
+  z.strictObject({
+    level: severity,
+    since: z.iso.date().optional(),
+    /** A size or count the rule measures against, e.g. bytes for `item-size`. */
+    limit: z.int().positive().optional(),
+  }),
 ]);
 
 const reportColumn = z.union([

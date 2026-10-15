@@ -17,6 +17,7 @@ import { liveBlock, liveBlockStale, writePlace } from "./live.ts";
 import { archiveStatus, lifecycle } from "./placement.ts";
 import { promptBody } from "./prompt.ts";
 import { headerRefs } from "./references.ts";
+import { itemSize } from "./size.ts";
 import { statusLine } from "./status-line.ts";
 import { knownStatus, knownType, typeStatus } from "./vocabulary.ts";
 
@@ -38,6 +39,7 @@ export const builtinRules: readonly Rule[] = [
   idFormat,
   itemEnum,
   duplicateId,
+  itemSize,
   promptBody,
   headerRefs,
   folderType,
