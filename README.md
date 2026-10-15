@@ -288,6 +288,8 @@ bun run trove check --store sandbox
 | [`sandbox/`](sandbox) | A green demo store for a made-up chat app: audits with ledgers and addenda, specs, plans, research, a study, an incident, prompts, two summaries, an archive. Use it to try commands; CI checks it and that its reports are current. |
 | [`test/fixtures/broken/`](test/fixtures/broken) | A store with one planted error per rule, on the Russian preset. |
 
+Both workflows also start by hand: **Actions → ci → Run workflow** on any branch, optionally on one OS, and **release → Run workflow** on `main`; a failed run has **Re-run failed jobs**.
+
 `bun run e2e` drives the whole lifecycle through the CLI in a throwaway workspace: `init`, `doc new`, `item add`, `item close --archive`, `check`, `doctor`.
 
 **Releases.** Every user-facing change adds a note with `bunx changeset`. On `main`, the release workflow turns pending notes into a `chore: release` PR; merging it bumps the version, writes `CHANGELOG.md` and tags the release. Opening that PR needs a `GH_BYPASS_TOKEN` secret with contents and pull-request write access when the repository forbids Actions to create pull requests.

@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: Runner to verify on
+        type: choice
+        options: [all, ubuntu-latest, windows-latest, macos-latest]
+        default: all
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -20,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: ${{ fromJSON(inputs.os && inputs.os != 'all' && format('["{0}"]', inputs.os) || '["ubuntu-latest", "windows-latest", "macos-latest"]') }}
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
