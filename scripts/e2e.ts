@@ -10,6 +10,7 @@ const app = join(workspace, "app");
 const env = {
   ...process.env,
   TROVE_HOME: join(workspace, "home"),
+  CLAUDE_CONFIG_DIR: join(workspace, "claude"),
   GIT_AUTHOR_NAME: "trove e2e",
   GIT_AUTHOR_EMAIL: "e2e@example.com",
   GIT_COMMITTER_NAME: "trove e2e",
@@ -64,6 +65,12 @@ try {
   ) {
     throw new Error("codex was not connected");
   }
+  await trove(["client", "add", "claude", "--local"]);
+  const claudeJson = await Bun.file(join(workspace, "claude", ".claude.json")).text();
+  if (!claudeJson.includes('"trove"') || (await Bun.file(join(app, ".mcp.json")).exists())) {
+    throw new Error("claude was not connected for this machine only");
+  }
+  await trove(["client", "add", "cursor", "--local"], 2);
   await trove(["doctor"]);
   const pushed = await Bun.$`git log --format=%s main`.cwd(remote).env(env).quiet().text();
   if (!pushed.includes("docs: close WEBCLIENT1-2, archive AUDIT_WEB_CLIENT_1")) {

@@ -59,7 +59,7 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 | `trove migrate <archive> <store> [--drop FILE] [--project DIR [--link]]` | Build a store from an existing archive: clone with history, uncommitted work as its own commit, a config fitted to the documents (language, extra types, statuses and whether they are written as keys, fields, ledger columns per type, status lines only where documents have them, what the archive keeps, the old backlog's group order), rebuilt reports, a count of documents and items before and after. The archive is only read. |
 | `trove store add <name> --scope <glob>` | Another store for a team with its own access; commands run under `--scope` folders go to it. |
 | `trove remote add <url>` | Connect a local store to a remote repository, switch `sync` to `push` and push the history. |
-| `trove client add <claude\|cursor\|codex>` | Register the MCP server and the skills for an assistant in this project. |
+| `trove client add <claude\|cursor\|codex> [--local]` | Register the MCP server and the skills for an assistant in this project; `--local` keeps them on this machine and out of the project (Claude Code). |
 | `trove doctor` · `trove forget` | Show the project, its stores and their health · drop the project from this machine's registry. |
 
 **Read**
@@ -119,12 +119,15 @@ Edits return the files they touched with line diffs; `dryRun: true` returns the 
 | Cursor | `trove client add cursor`: `.cursor/mcp.json` and `.cursor/skills/`. |
 | Codex | `trove client add codex`: `[mcp_servers.trove]` in `.codex/config.toml` and `.agents/skills/`. |
 | any | `trove client add claude` writes `.mcp.json` and `.claude/skills/` without the plugin; `trove init --client <name>` does it at creation. |
+| this machine only | `trove client add claude --local` writes nothing into the project: the MCP server goes to this project's entry in `~/.claude.json` (what `claude mcp add --scope local` does) and the skills to `~/.claude/skills/`, both under `$CLAUDE_CONFIG_DIR` when it is set. Cursor and Codex keep MCP servers only in the project or for every project, so they refuse `--local`. |
 
 The skills, `trove-store` and `trove-migrate`, live once in [`plugin/skills`](plugin/skills) and are bundled into the binary, so every client gets the same text.
 
 ## Concepts
 
 **Project and store.** The project is your code repository. The store is a separate git repository of its documents, next to it by default. The project keeps one pointer file, `.trove.yaml`; the machine keeps `~/.trove/registry.yaml`. Access to a store is access to its repository.
+
+`.trove.yaml` is optional once the project is in `~/.trove/registry.yaml`: commands find the store through the registry, so a shared repository that must not carry personal tools can leave the pointer uncommitted (list it in `.git/info/exclude`) or delete it. The limitation: `trove clone` reads the pointer, so without a committed `.trove.yaml` each teammate writes one locally and runs `trove clone`, or points at a hand-made clone with `--store` or `$TROVE_STORE`.
 
 **Archive.** Working folders sit next to an archive folder (`.archive/` by default) that mirrors them.
 
