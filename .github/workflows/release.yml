@@ -29,9 +29,8 @@ jobs:
       # Pending changesets → a "chore: release" PR; once it is merged → a git tag and a GitHub release.
       - uses: changesets/action@v2
         id: changesets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_BYPASS_TOKEN || github.token }}
         with:
+          github-token: ${{ secrets.GH_BYPASS_TOKEN || github.token }}
           version-script: bun run release:version
           publish-script: bunx changeset git-tag
           commit-message: "chore: release"
