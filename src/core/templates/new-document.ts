@@ -3,6 +3,7 @@ import { hasCapability, labelOf, ledgerOf } from "../config/vocabulary.ts";
 import { PROMPT_MARKER } from "../document/prompt.ts";
 import { formatValue } from "../edit/front-matter.ts";
 import { formatRow } from "../edit/ledger.ts";
+import { TroveError } from "../errors.ts";
 
 export type NewDocument = {
   type: string;
@@ -31,17 +32,35 @@ const ledgerSection = (config: Config, type: string): string[] => {
   ];
 };
 
-/** `{{name}}`, `{{title}}`, `{{status}}`, `{{date}}` and any header field. */
-export const fillTemplate = (template: string, input: NewDocument): string => {
+/**
+ * `{{name}}`, `{{title}}`, `{{status}}`, `{{date}}` and any header field; a declared field that
+ * was not given is left empty.
+ */
+export const fillTemplate = (
+  template: string,
+  input: NewDocument,
+  declared: readonly string[],
+): string => {
   const values: Record<string, string> = {
+    ...Object.fromEntries(declared.map((key) => [key, ""])),
     ...Object.fromEntries(input.fields),
     type: input.type,
     name: input.name,
     title: input.title,
     status: input.status,
     date: input.date,
+    checked: input.date,
   };
-  return template.replace(PLACEHOLDER, (whole, key: string) => values[key] ?? whole);
+  const unknown = new Set(
+    [...template.matchAll(PLACEHOLDER)]
+      .map(([whole, key = ""]) => (Object.hasOwn(values, key) ? "" : whole))
+      .filter(Boolean),
+  );
+  if (unknown.size > 0) {
+    const names = [...unknown].join(", ");
+    throw new TroveError(`the ${input.type} template uses ${names}, not a field of ${input.type}`);
+  }
+  return template.replace(PLACEHOLDER, (_, key: string) => values[key] ?? "");
 };
 
 export const renderNewDocument = (config: Config, input: NewDocument): string => {

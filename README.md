@@ -197,7 +197,7 @@ reports:
       - { from: items, where: { status: open }, groupBy: owner, sort: [id], columns: [id, what, document] }
 ```
 
-`trove init` writes a complete config from the [English or Russian preset](src/core/presets). The schema lives in [`src/core/config/schema.ts`](src/core/config/schema.ts); cross-references, such as a folder naming an unknown type, are reported before any document is read. `ignore` takes file names (`CONTRIBUTING.md`) and path globs (`notes/**`); `archive.finished` lists statuses a document may keep in the archive besides `archived`, such as `done` or `dropped`. A type's `initial` sets the status of new documents, and `templates: <folder>` with a `<type>.md` inside replaces the built-in template (`{{name}}`, `{{title}}`, `{{status}}`, `{{date}}` and any header field).
+`trove init` writes a complete config from the [English or Russian preset](src/core/presets). The schema lives in [`src/core/config/schema.ts`](src/core/config/schema.ts); cross-references, such as a folder naming an unknown type, are reported before any document is read. `ignore` takes file names (`CONTRIBUTING.md`) and path globs (`notes/**`); `archive.finished` lists statuses a document may keep in the archive besides `archived`, such as `done` or `dropped`. A type's `initial` sets the status of new documents, and `templates: <folder>` with a `<type>.md` inside replaces the built-in template (`{{name}}`, `{{title}}`, `{{status}}`, `{{date}}` and any header field; a field that was not given is left empty, and a placeholder that is not a field is refused).
 
 ### Summaries
 

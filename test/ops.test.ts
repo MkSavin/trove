@@ -216,6 +216,29 @@ describe("doc operations", () => {
     expect(() => nameBase("東京")).toThrow(/--name/);
   });
 
+  test("new fills a custom template, leaving optional fields empty", async () => {
+    const store = await sandbox();
+    await Bun.write(
+      join(store.root, "trove.yaml"),
+      `${await read(store, "trove.yaml")}\ntemplates: .trove/templates\n`,
+    );
+    const template = join(store.root, ".trove", "templates", "prompt.md");
+    await Bun.write(
+      template,
+      '---\ntype: {{type}}\nstatus: {{status}}\ndate: {{date}}\nchecked: {{checked}}\nscope: "{{scope}}"\nmodel: "{{model}}"\n---\n\n# {{name}} — {{title}}\n',
+    );
+    const next = await reopen(store);
+    const input = { type: "prompt", topic: "review", fields: { scope: "web/" } };
+    const [change] = (await newDocument(next.index, input)).changes;
+    expect(change?.text).toContain('scope: "web/"\nmodel: ""\n');
+    expect(change?.text).toContain("# PROMPT_REVIEW — review");
+
+    await Bun.write(template, "# {{name}} by {{reviewer}} and {{team}}\n");
+    await expect(newDocument(next.index, input)).rejects.toThrow(
+      "the prompt template uses {{reviewer}}, {{team}}, not a field of prompt",
+    );
+  });
+
   test("archive moves the file, rebases its links and retargets links to it", async () => {
     const store = await sandbox();
     await apply(store, archivePlan(store.index, requireDocument(store.index, "PLAN_PUSH_RETRY")));

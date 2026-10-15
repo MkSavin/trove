@@ -198,7 +198,7 @@ reports:
       - { from: items, where: { status: open }, groupBy: owner, sort: [id], columns: [id, what, document] }
 ```
 
-`trove init` пишет полный конфиг из [английского или русского пресета](src/core/presets). Схема — в [`src/core/config/schema.ts`](src/core/config/schema.ts); перекрёстные ссылки, например папка с неизвестным типом, проверяются до чтения документов. `ignore` принимает имена файлов (`CONTRIBUTING.md`) и glob путей (`notes/**`); `archive.finished` перечисляет статусы, кроме `archived`, с которыми документ может лежать в архиве, например `done` или `dropped`. `initial` типа задаёт статус новых документов, а `templates: <папка>` с `<type>.md` внутри заменяет встроенный шаблон (`{{name}}`, `{{title}}`, `{{status}}`, `{{date}}` и любые поля шапки).
+`trove init` пишет полный конфиг из [английского или русского пресета](src/core/presets). Схема — в [`src/core/config/schema.ts`](src/core/config/schema.ts); перекрёстные ссылки, например папка с неизвестным типом, проверяются до чтения документов. `ignore` принимает имена файлов (`CONTRIBUTING.md`) и glob путей (`notes/**`); `archive.finished` перечисляет статусы, кроме `archived`, с которыми документ может лежать в архиве, например `done` или `dropped`. `initial` типа задаёт статус новых документов, а `templates: <папка>` с `<type>.md` внутри заменяет встроенный шаблон (`{{name}}`, `{{title}}`, `{{status}}`, `{{date}}` и любые поля шапки; не заданное поле остаётся пустым, а заполнитель, который не является полем, отклоняется).
 
 ### Сводки
 
