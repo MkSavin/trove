@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { cp, mkdtemp, readdir, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import packageJson from "../package.json" with { type: "json" };
+import { run } from "../src/cli/run.ts";
 import { afterEdit, atStop } from "../src/clients/claude/hooks.ts";
+import { claudeUserPaths, installClaudeLocal, projectKey } from "../src/clients/claude/local.ts";
 import { SERVER, SERVER_NAME } from "../src/clients/clients.ts";
 import { installClient } from "../src/clients/install.ts";
 import { SKILLS } from "../src/clients/skills.ts";
 import { git } from "../src/core/git/git.ts";
-import { ROOT } from "./helpers.ts";
+import { captureIo, ROOT } from "./helpers.ts";
 
 const IDENTITY = {
   GIT_AUTHOR_NAME: "trove test",
@@ -64,6 +66,92 @@ describe("client add", () => {
   test("refuses to overwrite a broken config", async () => {
     await Bun.write(join(workspace, ".mcp.json"), "{ not json");
     await expect(installClient(workspace, "claude")).rejects.toThrow(/not valid JSON/);
+  });
+});
+
+describe("client add --local", () => {
+  const project = () => join(workspace, "app");
+  const user = () => claudeUserPaths({ CLAUDE_CONFIG_DIR: join(workspace, "user") });
+
+  beforeEach(() => mkdir(project()));
+
+  test("claude: the server goes to this project's entry of the user config, other keys stay", async () => {
+    const paths = user();
+    const key = projectKey(project());
+    await Bun.write(
+      paths.config,
+      JSON.stringify({
+        theme: "dark",
+        projects: {
+          [key]: { allowedTools: ["Bash"], mcpServers: { other: { command: "x" } } },
+          "/elsewhere": { mcpServers: {} },
+        },
+      }),
+    );
+    await installClaudeLocal(project(), paths);
+    await installClaudeLocal(project(), paths);
+
+    const config = await Bun.file(paths.config).json();
+    expect(config.theme).toBe("dark");
+    expect(config.projects["/elsewhere"]).toEqual({ mcpServers: {} });
+    expect(config.projects[key]).toEqual({
+      allowedTools: ["Bash"],
+      mcpServers: { other: { command: "x" }, [SERVER_NAME]: { type: "stdio", ...SERVER } },
+    });
+    expect(await Bun.file(join(paths.skillsDir, "trove-store", "SKILL.md")).text()).toBe(
+      SKILLS["trove-store"] ?? "",
+    );
+    expect(await readdir(project())).toEqual([]);
+    expect((await readdir(join(workspace, "user"))).toSorted()).toEqual([".claude.json", "skills"]);
+  });
+
+  test("claude: creates the user config when there is none and refuses a broken one", async () => {
+    const paths = user();
+    await installClaudeLocal(project(), paths);
+    expect((await Bun.file(paths.config).json()).projects[projectKey(project())]).toEqual({
+      mcpServers: { [SERVER_NAME]: { type: "stdio", ...SERVER } },
+    });
+
+    await Bun.write(paths.config, "{ not json");
+    await expect(installClaudeLocal(project(), paths)).rejects.toThrow(/not valid JSON/);
+    expect(await Bun.file(paths.config).text()).toBe("{ not json");
+  });
+
+  test("claude follows CLAUDE_CONFIG_DIR, else the home folder; keys use forward slashes", () => {
+    expect(claudeUserPaths({}, join("home", "me"))).toEqual({
+      config: join("home", "me", ".claude.json"),
+      skillsDir: join("home", "me", ".claude", "skills"),
+    });
+    expect(claudeUserPaths({ CLAUDE_CONFIG_DIR: "cfg" }, join("home", "me"))).toEqual({
+      config: join("cfg", ".claude.json"),
+      skillsDir: join("cfg", "skills"),
+    });
+    expect(projectKey(join("work", "app"))).toBe("work/app");
+  });
+
+  test("the CLI writes nothing into the project and refuses clients without a local config", async () => {
+    const saved = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = join(workspace, "user");
+    try {
+      const refused = captureIo(project());
+      expect(await run(["client", "add", "claude", "cursor", "--local"], refused)).toBe(2);
+      expect(refused.stderr()).toContain("add .cursor to .git/info/exclude");
+      expect(await Bun.file(user().config).exists()).toBe(false);
+
+      const codex = captureIo(project());
+      expect(await run(["client", "add", "codex", "--local"], codex)).toBe(2);
+      expect(codex.stderr()).toContain("add .codex and .agents to .git/info/exclude");
+
+      const io = captureIo(project());
+      expect(await run(["client", "add", "claude", "--local"], io)).toBe(0);
+      expect(io.stdout()).toContain(`✔ claude, this machine only: ${user().config}`);
+      expect(
+        (await Bun.file(user().config).json()).projects[projectKey(project())].mcpServers,
+      ).toHaveProperty(SERVER_NAME);
+      expect(await readdir(project())).toEqual([]);
+    } finally {
+      process.env.CLAUDE_CONFIG_DIR = saved;
+    }
   });
 });
 
