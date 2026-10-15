@@ -72,7 +72,7 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 | `trove show WEB1-4` | Print one item's section. Also takes `DOC#heading`, or a document name for its outline. |
 | `trove prompt PROMPT_X [--copy]` | Print a prompt's task text, or copy it; Cyrillic survives on Windows too. |
 | `trove report [name...]` · `trove rules` | Rebuild generated documents · list rules with their effective level. |
-| `trove links [--dead]` | Relative links to documents and code; code is checked under `roots` present on this machine, in the checkout or, with `{ path, ref: origin/main }`, at that commit whatever branch is checked out. |
+| `trove links [--dead]` | Relative links to documents and code; code is checked under `roots` present on this machine, in the checkout or, with `{ path, ref: origin/main }`, at that commit whatever branch is checked out. `--dead` ends with `N dead of M links`. |
 | `trove export items [filters] --format csv\|json` | Rows for a CRM or a spreadsheet; RFC 4180 CSV. |
 
 **Edit.** Every edit patches only its own lines, keeps CRLF, is checked in memory first and is not written if it adds an error. Generated reports are rebuilt in the same step; `--dry-run` prints the line diff instead.
@@ -88,6 +88,7 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 | `trove item close <id> [--commit SHA] [--archive]` | Drop the row, mark the section closed, list other mentions; `--archive` when it was the last open item. |
 | `trove item defer <id>` | Status cell and section note to deferred. |
 | `trove item move <id> <doc> [--archive]` | Move an item with its section to another ledger under the next id there; columns the target lacks are reported. |
+| `trove links [file] --fix` | Dead links into code that git deleted point at its last version: a permalink at the parent of the deleting commit when `origin` is on GitHub or GitLab and has it, otherwise a `*(deleted in abc1234)*` note after the link that `dead-link` checks at that commit. Links never in git history stay and are listed. |
 | `trove sync [-m TEXT]` | Commit hand edits together with rebuilt reports, then push by mode. Refuses while `check` is red. |
 
 **Filters** work the same in `query`, `summary`, `export`, report configs, generated blocks and MCP tools: `field=value` matches the raw text or the vocabulary key (`status=open` and `status=открыто` are the same), `~text` a substring, `*` and `**` a glob, and `!` in front excludes. Items also filter on their document's fields: `owner=web path=!audits/mobile/**` is everything for the web team outside the mobile audits. Repeat a field or use commas for alternatives.
