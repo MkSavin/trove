@@ -1,7 +1,8 @@
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
 import { TroveError } from "../errors.ts";
+import { samePath } from "../text/real-path.ts";
 
 const registrySchema = z.strictObject({
   projects: z
@@ -23,10 +24,6 @@ export const troveHome = (): string => process.env.TROVE_HOME ?? join(homedir(),
 const registryFile = () => Bun.file(join(troveHome(), "registry.yaml"));
 
 /** Windows paths differ only by case for the same folder. */
-export const samePath = (a: string, b: string): boolean =>
-  process.platform === "win32"
-    ? resolve(a).toLowerCase() === resolve(b).toLowerCase()
-    : resolve(a) === resolve(b);
 
 export const readRegistry = async (): Promise<Registry> => {
   const file = registryFile();

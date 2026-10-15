@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { git } from "../src/core/git/git.ts";
+import { git, toplevel } from "../src/core/git/git.ts";
 import { cloneStores } from "../src/core/store/clone.ts";
 import { diagnose } from "../src/core/store/doctor.ts";
 import { initStore } from "../src/core/store/init.ts";
@@ -11,6 +11,7 @@ import { locateStore } from "../src/core/store/locate.ts";
 import { readPointer } from "../src/core/store/pointer.ts";
 import { findProject, forgetProject } from "../src/core/store/registry.ts";
 import { listDocuments } from "../src/core/store/walk.ts";
+import { isInside, samePath } from "../src/core/text/real-path.ts";
 import { openStore, parseConfig, runRules } from "../src/index.ts";
 
 const IDENTITY = {
@@ -158,5 +159,20 @@ describe("listing documents", () => {
     );
     expect(await listDocuments(root, config)).toEqual(["plans/PLAN_A.md"]);
     await rm(root, { recursive: true, force: true, maxRetries: 5 });
+  });
+});
+
+describe("paths through a symlink", () => {
+  test("the repository root keeps the caller's spelling and paths compare by target", async () => {
+    const real = await mkdtemp(join(tmpdir(), "trove-real-"));
+    const alias = `${real}-alias`;
+    await symlink(real, alias, "junction");
+    await git(real, ["init", "-q"]);
+    await mkdir(join(real, "sub"));
+    expect(await toplevel(join(alias, "sub"))).toBe(alias);
+    expect(samePath(alias, real)).toBe(true);
+    expect(isInside(alias, join(real, "sub"))).toBe(true);
+    await rm(alias, { recursive: false, force: true, maxRetries: 5 });
+    await rm(real, { recursive: true, force: true, maxRetries: 5 });
   });
 });

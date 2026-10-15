@@ -1,5 +1,6 @@
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { TroveError } from "../errors.ts";
+import { realPath } from "../text/real-path.ts";
 
 export type GitResult = { ok: boolean; out: string; err: string };
 
@@ -34,8 +35,9 @@ export const gitOrThrow = async (
   return result.out;
 };
 
-/** Root of the repository containing `cwd`, or nothing outside a repository. */
+/** Root of the repository containing `cwd`, spelled like `cwd` even when git resolves symlinks. */
 export const toplevel = async (cwd: string): Promise<string | undefined> => {
   const result = await git(cwd, ["rev-parse", "--show-toplevel"]);
-  return result.ok ? resolve(result.out) : undefined;
+  if (!result.ok) return undefined;
+  return resolve(cwd, relative(realPath(cwd), realPath(result.out)));
 };

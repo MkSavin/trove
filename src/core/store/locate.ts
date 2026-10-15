@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { CONFIG_FILE } from "../config/load.ts";
 import { TroveError } from "../errors.ts";
+import { isInside, realPath } from "../text/real-path.ts";
 import { toPosix } from "./paths.ts";
 import { entryRoot, POINTER_FILE, readPointer } from "./pointer.ts";
 import { readRegistry } from "./registry.ts";
@@ -13,11 +14,6 @@ export const findUp = (from: string, file: string): string | undefined => {
   const parent = dirname(from);
   if (existsSync(join(from, file))) return from;
   return parent === from ? undefined : findUp(parent, file);
-};
-
-const isInside = (root: string, path: string): boolean => {
-  const rel = relative(root, path);
-  return !rel.startsWith("..") && !isAbsolute(rel);
 };
 
 const inScope = (candidate: Candidate, rel: string): boolean =>
@@ -57,7 +53,7 @@ const fromRegistry = async (cwd: string): Promise<string | undefined> => {
   const project = (await readRegistry()).projects.find((entry) => isInside(entry.root, cwd));
   if (!project) return undefined;
   const candidates = project.stores.map((store) => ({ name: store.name, root: store.path }));
-  return pick(candidates, toPosix(relative(project.root, cwd)));
+  return pick(candidates, toPosix(relative(realPath(project.root), realPath(cwd))));
 };
 
 /** `--store` (a store name, else a path), a store folder above `cwd`, `.trove.yaml`, the registry. */
@@ -71,7 +67,7 @@ export const locateStore = async (cwd: string, store?: string): Promise<string |
   const inStore = findUp(cwd, CONFIG_FILE);
   if (inStore) return inStore;
   if (projectRoot && candidates.length > 0) {
-    return pick(candidates, toPosix(relative(projectRoot, cwd)));
+    return pick(candidates, toPosix(relative(realPath(projectRoot), realPath(cwd))));
   }
   return fromRegistry(cwd);
 };

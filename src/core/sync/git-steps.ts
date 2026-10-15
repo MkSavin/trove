@@ -1,5 +1,5 @@
 import { git, gitOrThrow, toplevel } from "../git/git.ts";
-import { samePath } from "../store/registry.ts";
+import { samePath } from "../text/real-path.ts";
 import { settleLiveConflict } from "./settle-live.ts";
 
 export type Committed = { sha: string | undefined; error: string | undefined };
