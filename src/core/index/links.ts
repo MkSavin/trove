@@ -38,6 +38,12 @@ const codeRoot = (index: StoreIndex, absolute: string): CodeRoot | undefined =>
 
 const trees = new WeakMap<StoreIndex, Map<string, ReadonlySet<string> | undefined>>();
 
+/** Inside a git hook these point at the store's repository, not the code root's. */
+const HOOK_VARIABLES = new Set(["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"]);
+
+const codeRootEnv = (): Record<string, string | undefined> =>
+  Object.fromEntries(Object.entries(process.env).filter(([name]) => !HOOK_VARIABLES.has(name)));
+
 /** Files and folders at the ref, read once per index; missing when the ref is unknown here. */
 const treeAt = (index: StoreIndex, dir: string, ref: string): ReadonlySet<string> | undefined => {
   const cache = trees.get(index) ?? new Map<string, ReadonlySet<string> | undefined>();
@@ -45,7 +51,7 @@ const treeAt = (index: StoreIndex, dir: string, ref: string): ReadonlySet<string
   const key = `${dir}\0${ref}`;
   if (!cache.has(key)) {
     const args = ["git", "-C", dir, "ls-tree", "-r", "-t", "-z", "--name-only", ref];
-    const listed = Bun.spawnSync(args);
+    const listed = Bun.spawnSync(args, { env: codeRootEnv() });
     cache.set(
       key,
       listed.exitCode === 0
