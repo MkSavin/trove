@@ -1,0 +1,44 @@
+{
+  "name": "trove",
+  "version": "0.1.0",
+  "description": "Plain-Markdown archive of audits, plans and specs: one regulation, one checker, CLI and MCP on top.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "bin": {
+    "trove": "src/cli/main.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "scripts": {
+    "trove": "bun src/cli/main.ts",
+    "test": "bun test",
+    "typecheck": "bun check",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "verify": "bun run lint && bun run typecheck && bun test",
+    "e2e": "bun scripts/e2e.ts",
+    "build": "bun scripts/build.ts",
+    "release:version": "changeset version && bun scripts/sync-version.ts",
+    "prepare": "lefthook install"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@changesets/cli": "3.0.3",
+    "@modelcontextprotocol/client": "2.3.1",
+    "@types/bun": "1.4.3",
+    "lefthook": "2.2.2",
+    "typescript": "7.0.2"
+  }
+}

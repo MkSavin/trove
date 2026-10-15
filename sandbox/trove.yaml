@@ -1,0 +1,165 @@
+# Demo store of a made-up team chat app, Harbor. Green by design: CI checks it and its reports.
+regulation: 1
+language: en
+sync: off
+
+roots:
+  harbor: ../harbor
+
+folders:
+  audits: { prefix: AUDIT_, types: [audit, addition] }
+  specs: { prefix: SPEC_, types: [spec] }
+  plans: { prefix: PLAN_, types: [plan] }
+  research: { prefix: [RESEARCH_, INCIDENT_, STUDY_], types: [research, incident, study] }
+  external: { prefix: EXTERNAL_, types: [external] }
+  prompts: { prefix: PROMPT_, types: [prompt] }
+  summaries: { prefix: SUMMARY_, types: [summary] }
+
+statuses:
+  open: open
+  in-progress: in progress
+  not-started: not started
+  closed: closed
+  current: current
+  archived: archived
+
+fields:
+  type: required
+  status: required
+  scope: required
+  date: { required: true, format: date }
+  checked: { required: true, format: date }
+  verify: optional
+  supersedes: { format: refs }
+  superseded_by: { format: refs }
+
+types:
+  audit:
+    purpose: "Findings about existing code, with a ledger of what is left to fix. Not for code that is still to be written: that is a spec or a plan."
+    capabilities: [ledger, series, status-line, freshness]
+    fields:
+      slug: required
+      addition: { format: refs }
+  addition:
+    purpose: "Working notes of one audit: draft ids, corrections, what was checked and dropped. Carries no open items."
+    capabilities: [addition-of, status-line, freshness]
+    initial: current
+    fields:
+      base: { required: true, format: refs }
+  spec: { purpose: "The behaviour to build, as a contract. Archived once fully built; how the system works today is not a spec.", capabilities: [versions, status-line, freshness], initial: not-started }
+  plan: { purpose: "Work in stages, each with a done-when, including the plan of a process such as a rollout or a migration.", capabilities: [status-line, freshness], initial: not-started }
+  research: { purpose: "The report of a finished investigation: the question, what was found, the conclusion or recommendation. An investigation still under way is a study; work to do is a plan.", capabilities: [status-line, freshness] }
+  incident: { purpose: "One incident or complaint taken apart from logs: timeline, causes, follow-ups filed elsewhere.", capabilities: [status-line, freshness] }
+  study: { purpose: "An investigation still running or still to run: the question, hypotheses, steps and what to measure. Its answer goes into a research report.", capabilities: [status-line, freshness], initial: in-progress }
+  external: { purpose: "A report received from outside, kept as it came.", capabilities: [status-line, freshness], initial: current }
+  prompt:
+    purpose: "A large task for an AI agent that is run again, refined and handed to colleagues."
+    capabilities: [prompt-body, status-line, freshness]
+    statuses: [current, archived]
+    freshness: 90
+    fields: { produces: optional, model: optional }
+  debt:
+    purpose: "What plans promised from other teams and the code does not do yet."
+    capabilities: [ledger, status-line, freshness]
+    initial: current
+    ledger:
+      id: "DEBT-{section}{n}"
+      sections: { Server: S, Infra: I }
+      columns:
+        - { key: id, label: id, required: true }
+        - { key: status, label: status, required: true, enum: [open, deferred] }
+        - { key: what, label: what was promised, required: true }
+        - { key: plan, label: plan }
+      open: [open, deferred]
+      closed: done
+  risk: { purpose: "Assumptions of shipped code that nobody has verified on a real device yet.", capabilities: [status-line, freshness], initial: current }
+  summary:
+    purpose: "A dated look at one slice of the store: generated status blocks plus written analysis. Create it with `trove summary new <kind>`; archive it when a newer one replaces it."
+    capabilities: [status-line, freshness]
+    initial: current
+    freshness: 14
+    fields: { kind: optional }
+  backlog: { purpose: "Generated from other documents; never edited by hand.", capabilities: [generated, status-line] }
+
+ledger:
+  id: "{slug}-{n}"
+  columns:
+    - { key: id, label: id, required: true }
+    - { key: priority, label: P, required: true, enum: [P0, P1, P2, P3, P4] }
+    - { key: module, label: module }
+    - { key: owner, label: owner, required: true, enum: [web, api, mobile, infra, product] }
+    - { key: status, label: status, required: true, enum: [open, deferred] }
+    - { key: what, label: what is left, required: true }
+
+lifecycle:
+  audit:
+    - { when: no-open-items, place: archive }
+    - { when: has-open-items, place: work }
+  spec:
+    - { when: { status: closed }, place: archive }
+  plan:
+    - { when: { status: closed }, place: archive }
+  study:
+    - { when: { status: closed }, place: archive }
+  summary:
+    - { when: { status: archived }, place: archive }
+
+rules:
+  unknown-field: error
+  folder-type: error
+
+reports:
+  backlog:
+    output: BACKLOG.md
+    type: backlog
+    status: current
+    title: BACKLOG — what is left across all audits
+    scope: all audits
+    note: Generated from the audit ledgers; do not edit by hand.
+    intro: >-
+      Rebuild with `trove report backlog`. To close an item, remove its row from the ledger of the
+      audit that owns it and rebuild.
+    sections:
+      - from: items
+        where: { type: audit, status: [open, deferred] }
+        groupBy: owner
+        groupOrder: [web, api, mobile, infra, product]
+        sort: [priority, id]
+        columns: [id, priority, module, status, what, { key: document, label: audit }]
+      - from: documents
+        title: Specs and plans not finished yet
+        where: { type: [spec, plan], place: work }
+        sort: [type, path]
+        columns:
+          - { key: document, label: document }
+          - status
+          - { key: verify, label: how to verify, empty: "" }
+
+  prompts-index:
+    output: prompts/README.md
+    type: backlog
+    status: current
+    title: Prompts — index
+    scope: prompts/
+    note: Generated from prompt headers; do not edit by hand.
+    intro: "Rebuild with `trove report prompts-index`. Task text: `trove prompt <name> [--copy]`."
+    sections:
+      - from: documents
+        where: { type: prompt, place: work }
+        sort: [path]
+        columns:
+          - { key: document, label: prompt }
+          - scope
+          - { key: model, label: for }
+          - produces
+          - checked
+
+summaries:
+  web:
+    title: Web client — what is left
+    scope: web client
+    template: .trove/templates/web.md
+  outside-web:
+    title: Everything but the web audit
+    scope: all audits except AUDIT_WEB_1
+    filter: { path: "!audits/AUDIT_WEB_1.md" }

@@ -1,0 +1,44 @@
+import { basename, posix } from "node:path";
+import type { ReportColumn } from "../config/schema.ts";
+import { allLedgers } from "../config/vocabulary.ts";
+import type { Document } from "../document/document.ts";
+import type { Item } from "../document/ledger.ts";
+import type { StoreIndex } from "../index/index.ts";
+import { documentField, itemField } from "../index/query.ts";
+
+export type ReportRow = Document | Item;
+
+const EMPTY = "—";
+const DOCUMENT_COLUMN = "document";
+
+export const isDocument = (row: ReportRow): row is Document => "rel" in row;
+
+const linkTo = (rel: string, outputDir: string): string =>
+  `[${basename(rel, ".md")}](${posix.relative(outputDir, rel)})`;
+
+/** Groups of documents read as links to them; other groups as their value. */
+export const groupTitle = (name: string, key: string, outputDir: string): string =>
+  key === DOCUMENT_COLUMN && name ? linkTo(name, outputDir) : name;
+
+export const rowField = (row: ReportRow, key: string, index: StoreIndex): string | undefined =>
+  isDocument(row) ? documentField(row, key, index) : itemField(row, key, index);
+
+export const columnLabel = (column: ReportColumn, index: StoreIndex): string =>
+  column.label ??
+  allLedgers(index.config)
+    .flatMap((ledger) => ledger.columns)
+    .find((ledgerColumn) => ledgerColumn.key === column.key)?.label ??
+  column.key;
+
+/** Cell text with links relative to the report file, so they work wherever it is opened. */
+export const cellText = (
+  row: ReportRow,
+  column: ReportColumn,
+  index: StoreIndex,
+  outputDir: string,
+): string => {
+  const rel = isDocument(row) ? row.rel : row.document;
+  const value =
+    column.key === DOCUMENT_COLUMN ? linkTo(rel, outputDir) : rowField(row, column.key, index);
+  return value ? value.replaceAll("|", "\\|") : (column.empty ?? EMPTY);
+};

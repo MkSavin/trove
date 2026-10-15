@@ -1,0 +1,13 @@
+{
+  "name": "trove",
+  "description": "trove for Claude Code: the MCP server, skills for working in and migrating to a store, and hooks that check edited documents and sync at the end of a session.",
+  "author": {
+    "name": "Maxim Savin",
+    "url": "https://github.com/MkSavin"
+  },
+  "homepage": "https://github.com/MkSavin/trove",
+  "repository": "https://github.com/MkSavin/trove",
+  "license": "MIT",
+  "keywords": ["documentation", "audits", "markdown", "mcp"],
+  "version": "0.1.0"
+}

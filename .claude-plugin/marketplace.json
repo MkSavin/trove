@@ -1,0 +1,13 @@
+{
+  "name": "trove-marketplace",
+  "description": "trove: a plain-Markdown archive of audits, plans and specs with one checker",
+  "owner": { "name": "Maxim Savin", "url": "https://github.com/MkSavin" },
+  "plugins": [
+    {
+      "name": "trove",
+      "source": "./plugin",
+      "description": "MCP server, skills and hooks for trove stores",
+      "category": "productivity"
+    }
+  ]
+}

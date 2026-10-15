@@ -1,0 +1,202 @@
+import { z } from "zod";
+
+const oneOrMany = <T extends z.ZodType>(item: T) =>
+  z.union([item, z.array(item)]).transform((value) => (Array.isArray(value) ? value : [value]));
+
+export const CAPABILITIES = [
+  "ledger",
+  "series",
+  "versions",
+  "prompt-body",
+  "addition-of",
+  "status-line",
+  "freshness",
+  "generated",
+] as const;
+
+export const SEVERITIES = ["error", "warn", "info", "off"] as const;
+
+const severity = z.enum(SEVERITIES);
+
+const field = z.union([
+  z.enum(["required", "optional"]).transform((value) => ({
+    required: value === "required",
+    format: "text" as const,
+  })),
+  z.strictObject({
+    required: z.boolean().default(false),
+    format: z.enum(["text", "date", "refs"]).default("text"),
+  }),
+]);
+
+const fields = z.record(z.string(), field).default({});
+
+const folder = z.strictObject({
+  prefix: oneOrMany(z.string()),
+  types: z.array(z.string()).min(1),
+});
+
+const enumeration = z
+  .union([z.array(z.string()), z.record(z.string(), z.string())])
+  .transform((value) =>
+    Array.isArray(value) ? Object.fromEntries(value.map((key) => [key, key])) : value,
+  );
+
+const ledgerColumn = z.strictObject({
+  key: z.string(),
+  label: z.string(),
+  required: z.boolean().default(false),
+  enum: enumeration.optional(),
+});
+
+const ledger = z.strictObject({
+  marker: z.string().default("ledger"),
+  /** `{field}` reads the document header, `{section}` the table's code in `sections`, `{n}` counts. */
+  id: z.string().default("{slug}-{n}"),
+  /** Heading a table sits under → its id code, e.g. `{ Server: S }` for `DEBT-S1`. */
+  sections: z.record(z.string(), z.string()).optional(),
+  columns: z.array(ledgerColumn).min(1),
+  /** Item status keys that keep a document out of the archive. */
+  open: z.array(z.string()).default(["open"]),
+  /** Written into the heading of a closed item; may hold `{date}` and `{commit}`. */
+  closed: z.string().default("closed"),
+});
+
+const documentType = z.strictObject({
+  /** What belongs in this type and what does not; the placement regulation is built from it. */
+  purpose: z.string().optional(),
+  capabilities: z.array(z.enum(CAPABILITIES)).default([]),
+  /** Status keys this type may carry; any known status when omitted. */
+  statuses: z.array(z.string()).optional(),
+  /** Status key of a new document; the first allowed status when omitted. */
+  initial: z.string().optional(),
+  fields,
+  freshness: z.int().positive().optional(),
+  /** Its own ledger columns and statuses, e.g. for a debt list; the store's ledger otherwise. */
+  ledger: ledger.optional(),
+});
+
+const lifecycleStep = z.strictObject({
+  when: z.union([
+    z.enum(["no-open-items", "has-open-items"]),
+    z.strictObject({ status: z.string() }),
+  ]),
+  place: z.enum(["archive", "work"]),
+});
+
+const ruleSetting = z.union([
+  severity.transform((level) => ({ level, since: undefined })),
+  z.strictObject({ level: severity, since: z.iso.date().optional() }),
+]);
+
+const reportColumn = z.union([
+  z.string().transform((key) => ({ key, label: undefined, empty: undefined })),
+  z.strictObject({ key: z.string(), label: z.string().optional(), empty: z.string().optional() }),
+]);
+
+const reportSection = z.strictObject({
+  title: z.string().optional(),
+  from: z.enum(["items", "documents"]),
+  where: z.record(z.string(), oneOrMany(z.string())).default({}),
+  groupBy: z.string().optional(),
+  groupOrder: z.array(z.string()).default([]),
+  sort: z.array(z.string()).default([]),
+  /** Counts rows per value of this field instead of listing them. */
+  count: z.string().optional(),
+  columns: z.array(reportColumn).default([]),
+});
+
+const filters = z.record(z.string(), oneOrMany(z.string()));
+
+/** A kind of summary: documents created from one template under one base filter. */
+const summary = z.strictObject({
+  title: z.string(),
+  type: z.string().default("summary"),
+  scope: z.string().optional(),
+  filter: filters.default({}),
+  /** Store-relative template; the built-in layout when omitted. */
+  template: z.string().optional(),
+});
+
+const report = z.strictObject({
+  output: z.string(),
+  type: z.string(),
+  status: z.string(),
+  title: z.string(),
+  scope: z.string(),
+  note: z.string(),
+  intro: z.string().optional(),
+  sections: z.array(reportSection).min(1),
+});
+
+/** A code repository next to the store; with `ref`, links are checked against that commit. */
+const codeRoot = z.union([
+  z.string().transform((path) => ({ path, ref: undefined })),
+  z.strictObject({ path: z.string(), ref: z.string().optional() }),
+]);
+
+export const configSchema = z.strictObject({
+  regulation: z.literal(1),
+  language: z.string().default("en"),
+  sync: z.enum(["off", "commit", "push"]).default("off"),
+  roots: z.record(z.string(), codeRoot).default({}),
+  folders: z.record(z.string(), folder).default({}),
+  archive: z
+    .strictObject({
+      folder: z.string(),
+      /** Set by `doc archive`. */
+      status: z.string(),
+      /** Other statuses a document may keep in the archive, e.g. `done` or `dropped`. */
+      finished: z.array(z.string()).default([]),
+    })
+    .default({ folder: ".archive", status: "archived", finished: [] }),
+  /** File names that are not documents, matched anywhere in the store. */
+  ignore: z.array(z.string()).default(["AGENTS.md", "README.md"]),
+  /** Files whose `<!-- regulation:<topic> -->` blocks are rebuilt with the reports. */
+  regulationFiles: z.array(z.string()).default(["AGENTS.md"]),
+  statuses: z.record(z.string(), z.string()),
+  labels: z
+    .strictObject({
+      statusLine: z.string().default("Status"),
+      checked: z.string().default("Checked"),
+      ledger: z.string().default("Ledger"),
+      count: z.string().default("count"),
+      summaryCounts: z.string().default("By priority"),
+      summaryItems: z.string().default("Open items"),
+      summaryDocuments: z.string().default("Documents in work"),
+    })
+    .default({
+      statusLine: "Status",
+      checked: "Checked",
+      ledger: "Ledger",
+      count: "count",
+      summaryCounts: "By priority",
+      summaryItems: "Open items",
+      summaryDocuments: "Documents in work",
+    }),
+  fields,
+  types: z.record(z.string(), documentType),
+  ledger: ledger.optional(),
+  lifecycle: z.record(z.string(), z.array(lifecycleStep)).default({}),
+  freshness: z.strictObject({ default: z.int().positive() }).default({ default: 60 }),
+  rules: z.record(z.string(), ruleSetting).default({}),
+  reports: z.record(z.string(), report).default({}),
+  plugins: z.string().optional(),
+  /** Folder of `<type>.md` files that replace the built-in template of a new document. */
+  templates: z.string().optional(),
+  summaries: z.record(z.string(), summary).default({}),
+});
+
+export type Config = z.output<typeof configSchema>;
+export type ConfigInput = z.input<typeof configSchema>;
+export type Capability = (typeof CAPABILITIES)[number];
+export type Severity = (typeof SEVERITIES)[number];
+export type FieldSpec = z.output<typeof field>;
+export type DocumentTypeConfig = z.output<typeof documentType>;
+export type LedgerConfig = z.output<typeof ledger>;
+export type LedgerColumn = z.output<typeof ledgerColumn>;
+export type LifecycleStep = z.output<typeof lifecycleStep>;
+export type ReportConfig = z.output<typeof report>;
+export type ReportSection = z.output<typeof reportSection>;
+export type ReportColumn = z.output<typeof reportColumn>;
+export type SummaryConfig = z.output<typeof summary>;

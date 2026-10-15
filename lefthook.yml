@@ -1,0 +1,10 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: lint
+      glob: "*.{ts,json}"
+      run: bunx biome check --no-errors-on-unmatched {staged_files}
+    - name: types
+      run: bun check
+    - name: test
+      run: bun test

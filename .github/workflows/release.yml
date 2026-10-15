@@ -1,0 +1,39 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      LEFTHOOK: 0
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      # Pending changesets → a "chore: release" PR; once it is merged → a git tag and a GitHub release.
+      - uses: changesets/action@v2
+        id: changesets
+        with:
+          version-script: bun run release:version
+          publish-script: bunx changeset git-tag
+          commit-message: "chore: release"
+          pr-title: "chore: release"
+      - name: Attach single-file binaries to the release
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bun scripts/build.ts
+          version=$(bun -e 'console.log((await Bun.file("package.json").json()).version)')
+          gh release upload "v$version" dist/* --clobber

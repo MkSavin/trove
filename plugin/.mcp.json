@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "trove": { "command": "trove", "args": ["mcp"] }
+  }
+}

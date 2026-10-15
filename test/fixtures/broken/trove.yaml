@@ -1,0 +1,134 @@
+# trove store config; see the Config section of the trove README.
+regulation: 1
+language: ru
+sync: off
+
+roots: {}
+
+folders:
+  audits: { prefix: AUDIT_, types: [audit, addition] }
+  specs: { prefix: SPEC_, types: [spec] }
+  plans: { prefix: PLAN_, types: [plan] }
+  research: { prefix: [RESEARCH_, INCIDENT_], types: [research, incident] }
+  external: { prefix: EXTERNAL_, types: [external] }
+  prompts: { prefix: PROMPT_, types: [prompt] }
+
+statuses:
+  open: открыт
+  in-progress: в работе
+  not-started: не начат
+  closed: закрыт
+  current: актуален
+  archived: архив
+
+labels:
+  statusLine: Статус документа
+  checked: Сверено
+  ledger: Реестр открытых пунктов
+
+fields:
+  type: required
+  status: required
+  scope: required
+  date: { required: true, format: date }
+  checked: { required: true, format: date }
+  verify: optional
+  supersedes: { format: refs }
+  superseded_by: { format: refs }
+
+types:
+  audit:
+    purpose: "Находки по существующему коду и реестр того, что осталось исправить. Не для кода, который ещё предстоит написать: это спека или план."
+    capabilities: [ledger, series, status-line, freshness]
+    fields:
+      slug: required
+      addition: { format: refs }
+  addition:
+    purpose: "Рабочие материалы одного аудита: черновые id, поправки, проверенное и снятое. Открытых пунктов не несёт."
+    capabilities: [addition-of, status-line, freshness]
+    initial: current
+    fields:
+      base: { required: true, format: refs }
+  spec: { purpose: "Поведение, которое нужно построить, как договор. Реализована целиком — в архив; как система устроена сейчас, спека не описывает.", capabilities: [versions, status-line, freshness], initial: not-started }
+  plan: { purpose: "Работа по этапам, у каждого критерий готовности. Сюда же план процесса, который ещё предстоит провести: исследования, раскатки.", capabilities: [status-line, freshness], initial: not-started }
+  research: { purpose: "Отчёт о проведённом исследовании: вопрос, что найдено, вывод или рекомендация. Шаги, которые ещё предстоит сделать, — это план.", capabilities: [status-line, freshness] }
+  incident: { purpose: "Разбор одного инцидента или жалобы по логам: хронология, причины, задачи заведены в других документах.", capabilities: [status-line, freshness] }
+  external: { purpose: "Присланный извне отчёт, как есть.", capabilities: [status-line, freshness], initial: current }
+  prompt:
+    purpose: "Крупное задание для ИИ-агента: запускается повторно, правится, передаётся коллегам."
+    capabilities: [prompt-body, status-line, freshness]
+    statuses: [current, archived]
+    fields: { produces: optional, model: optional }
+  debt: { purpose: "Что планы обещали от других команд, а в коде этого ещё нет.", capabilities: [status-line, freshness], initial: current }
+  risk: { purpose: "Допущения выкаченного кода, которые никто не проверил на живом устройстве.", capabilities: [status-line, freshness], initial: current }
+  backlog: { purpose: "Собирается из других документов, руками не правится.", capabilities: [generated, status-line] }
+
+ledger:
+  id: "{slug}-{n}"
+  columns:
+    - { key: id, label: id, required: true }
+    - { key: priority, label: P, required: true }
+    - { key: module, label: модуль }
+    - { key: owner, label: владелец, required: true }
+    - { key: status, label: статус, required: true, enum: { open: открыто, deferred: отложено } }
+    - { key: what, label: что осталось, required: true }
+  open: [open]
+  closed: закрыто
+
+lifecycle:
+  audit:
+    - { when: no-open-items, place: archive }
+    - { when: has-open-items, place: work }
+  spec:
+    - { when: { status: closed }, place: archive }
+  plan:
+    - { when: { status: closed }, place: archive }
+
+freshness: { default: 60 }
+
+rules: {}
+
+reports:
+  backlog:
+    output: BACKLOG.md
+    type: backlog
+    status: current
+    title: BACKLOG — что осталось по всем аудитам
+    scope: все аудиты
+    note: Собран из реестров аудитов, руками не правится.
+    intro: >-
+      Файл генерируется: `trove report backlog`. Закрыть пункт: `trove item close <id>`.
+    sections:
+      - from: items
+        where: { status: [open, deferred] }
+        groupBy: owner
+        groupOrder: [frontend]
+        sort: [priority, id]
+        columns: [id, priority, module, status, what, { key: document, label: аудит }]
+      - from: documents
+        title: Спеки и планы, не доведённые до конца
+        where: { type: [spec, plan], place: work }
+        sort: [type, path]
+        columns:
+          - { key: document, label: документ }
+          - { key: status, label: статус }
+          - { key: verify, label: как проверить, empty: "" }
+
+  prompts-index:
+    output: prompts/README.md
+    type: backlog
+    status: current
+    title: Промпты — индекс
+    scope: prompts/
+    note: Собран из шапок промптов, руками не правится.
+    intro: "Файл генерируется: `trove report prompts-index`. Текст задания: `trove prompt <файл> [--copy]`."
+    sections:
+      - from: documents
+        where: { type: prompt, place: work }
+        sort: [path]
+        columns:
+          - { key: document, label: промпт }
+          - { key: scope, label: область }
+          - { key: model, label: для кого }
+          - { key: produces, label: рождает }
+          - { key: checked, label: сверено }
