@@ -291,7 +291,7 @@ bun run trove check --store sandbox
 
 `bun run e2e` прогоняет весь цикл через CLI во временной папке: `init`, `doc new`, `item add`, `item close --archive`, `check`, `doctor`.
 
-**Релизы.** Каждое заметное для пользователя изменение добавляет заметку через `bunx changeset`. На `main` workflow релиза превращает накопленные заметки в PR `chore: release`; его слияние поднимает версию, пишет `CHANGELOG.md` и ставит тег.
+**Релизы.** Каждое заметное для пользователя изменение добавляет заметку через `bunx changeset`. На `main` workflow релиза превращает накопленные заметки в PR `chore: release`; его слияние поднимает версию, пишет `CHANGELOG.md` и ставит тег. Если в репозитории Actions запрещено создавать PR, нужен секрет `GH_BYPASS_TOKEN` с правами на запись содержимого и pull request.
 
 ## План
 

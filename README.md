@@ -290,7 +290,7 @@ bun run trove check --store sandbox
 
 `bun run e2e` drives the whole lifecycle through the CLI in a throwaway workspace: `init`, `doc new`, `item add`, `item close --archive`, `check`, `doctor`.
 
-**Releases.** Every user-facing change adds a note with `bunx changeset`. On `main`, the release workflow turns pending notes into a `chore: release` PR; merging it bumps the version, writes `CHANGELOG.md` and tags the release.
+**Releases.** Every user-facing change adds a note with `bunx changeset`. On `main`, the release workflow turns pending notes into a `chore: release` PR; merging it bumps the version, writes `CHANGELOG.md` and tags the release. Opening that PR needs a `GH_BYPASS_TOKEN` secret with contents and pull-request write access when the repository forbids Actions to create pull requests.
 
 ## Roadmap
 
