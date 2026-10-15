@@ -3,16 +3,20 @@ import { existsSync } from "node:fs";
 import { cp, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { run } from "../src/cli/run.ts";
 import { git } from "../src/core/git/git.ts";
+import { sourceHealth } from "../src/core/migrate/drift.ts";
 import { migrateArchive } from "../src/core/migrate/migrate.ts";
 import { continueResync, resyncStore } from "../src/core/migrate/resync.ts";
+import { sealSource } from "../src/core/migrate/seal.ts";
 import { applyPlan } from "../src/core/ops/apply.ts";
 import { archivePlan } from "../src/core/ops/doc-archive.ts";
 import { requireDocument } from "../src/core/ops/find.ts";
 import { closeItem } from "../src/core/ops/item-close.ts";
 import type { Plan } from "../src/core/ops/plan.ts";
+import { diagnose } from "../src/core/store/doctor.ts";
 import { openStore, runRules, type Store } from "../src/index.ts";
-import { ROOT, TODAY } from "./helpers.ts";
+import { captureIo, ROOT, TODAY } from "./helpers.ts";
 
 const IDENTITY = {
   GIT_AUTHOR_NAME: "trove test",
@@ -144,5 +148,135 @@ describe("resync", () => {
     await edit(source, "RISKS.md", "1 open risk.", "1 open risk, source moved on.");
     const result = await resyncStore(await open(), source);
     expect(result.files.map((file) => file.path)).toEqual(["RISKS.md"]);
+  });
+});
+
+describe("resync of a document the source moved into its archive", () => {
+  const FROM = "plans/PLAN_PUSH_RETRY.md";
+  const TO = ".archive/plans/PLAN_PUSH_RETRY.md";
+
+  const archiveAtSource = async () => {
+    await git(source, ["mv", FROM, TO]);
+    await edit(source, TO, "status: in progress", "status: archived");
+    await edit(source, TO, "**Status:** in progress.", "**Status:** archived.");
+    await commitAll(source, "docs: archive PLAN_PUSH_RETRY");
+  };
+
+  test("is one move that keeps the store's own edits", async () => {
+    await edit(target, FROM, "Not started.", "Not started, needs an owner.");
+    await commitAll(target, "docs: store edit");
+    await archiveAtSource();
+
+    const result = await resyncStore(await open());
+    expect(result.files).toEqual([{ path: `${FROM} → ${TO}`, outcome: "moved" }]);
+    expect(existsSync(join(target, FROM))).toBe(false);
+    const moved = await Bun.file(join(target, TO)).text();
+    expect(moved).toContain("status: archived");
+    expect(moved).toContain("needs an owner");
+    expect((await resyncStore(await open())).upToDate).toBe(true);
+  });
+
+  test("is printed as one moved line", async () => {
+    await archiveAtSource();
+    const io = captureIo(workspace);
+    expect(await run(["resync", "--store", target], io)).toBe(0);
+    const lines = io.stdout().split("\n");
+    expect(lines.filter((line) => line.includes("PLAN_PUSH_RETRY"))).toEqual([
+      expect.stringMatching(/^ {2}moved +plans\/PLAN_PUSH_RETRY\.md → \.archive\//),
+    ]);
+  });
+
+  test("is not made twice when the store archived the document too", async () => {
+    await inStore(
+      (s) => archivePlan(s.index, requireDocument(s.index, "PLAN_PUSH_RETRY")),
+      "docs: archive PLAN_PUSH_RETRY",
+    );
+    await archiveAtSource();
+    const result = await resyncStore(await open());
+    expect(result.files).toEqual([{ path: `${FROM} → ${TO}`, outcome: "moved" }]);
+    expect(existsSync(join(target, FROM))).toBe(false);
+  });
+});
+
+describe("sealing the source", () => {
+  test("marks the archive as moved, commits only that there and is not brought back", async () => {
+    await edit(source, "RISKS.md", "1 open risk.", "1 open risk, edited at the source.");
+    const io = captureIo(workspace);
+    expect(await run(["resync", "--seal", "--store", target], io)).toBe(0);
+    expect(io.stdout()).toContain(`✔ sealed ${source}: MOVED.md, AGENTS.md, committed`);
+
+    expect(await Bun.file(join(source, "MOVED.md")).text()).toContain("`../notes-trove`");
+    const agents = await Bun.file(join(source, "AGENTS.md")).text();
+    expect(agents.split("\n")[0]).toStartWith(
+      "> **Moved.** This archive moved to `../notes-trove`",
+    );
+    expect((await git(source, ["log", "-1", "--format=%s"])).out).toBe(
+      "docs: moved to notes-trove",
+    );
+    expect((await git(source, ["status", "--porcelain"])).out).toBe("M RISKS.md");
+    expect(await Bun.file(join(target, "RISKS.md")).text()).toContain("edited at the source");
+
+    expect(existsSync(join(target, "MOVED.md"))).toBe(false);
+    expect((await sourceHealth(target))?.changed).toBe(false);
+    expect((await resyncStore(await open())).upToDate).toBe(true);
+
+    await sealSource(target);
+    const again = await Bun.file(join(source, "AGENTS.md")).text();
+    expect(again.match(/\*\*Moved\.\*\*/g)).toHaveLength(1);
+  });
+
+  test("creates AGENTS.md when the archive has none", async () => {
+    await git(source, ["rm", "--quiet", "AGENTS.md"]);
+    await commitAll(source, "docs: no agent notes");
+    expect((await resyncStore(await open())).commit).toBeDefined();
+    await sealSource(target);
+    expect(await Bun.file(join(source, "AGENTS.md")).text()).toStartWith("> **Moved.**");
+  });
+
+  test("refuses while the archive holds work the store has not taken in", async () => {
+    await edit(source, "RISKS.md", "1 open risk.", "1 open risk, not resynced.");
+    await expect(sealSource(target)).rejects.toThrow(/run trove resync first/);
+    expect(existsSync(join(source, "MOVED.md"))).toBe(false);
+  });
+});
+
+describe("doctor and the source", () => {
+  const app = () => join(workspace, "app");
+
+  beforeEach(async () => {
+    await git(workspace, ["init", "--quiet", "app"]);
+    await Bun.write(
+      join(app(), ".trove.yaml"),
+      "stores:\n  - name: main\n    path: ../notes-trove\n",
+    );
+  });
+
+  const changed = async () => (await diagnose(app())).stores[0]?.source?.changed;
+
+  test("warns when the archive changed after the last resync", async () => {
+    expect((await diagnose(app())).stores[0]?.source).toEqual({ path: source, changed: false });
+
+    await edit(source, "RISKS.md", "1 open risk.", "1 open risk, edited at the source.");
+    expect(await changed()).toBe(true);
+    const io = captureIo(app());
+    expect(await run(["doctor"], io)).toBe(0);
+    expect(io.stdout()).toContain(`! main: ${source} changed after the last resync`);
+
+    await commitAll(source, "docs: risks");
+    expect(await changed()).toBe(true);
+    await resyncStore(await open());
+    expect(await changed()).toBe(false);
+  });
+
+  test("compares a source that is not a repository too", async () => {
+    const plain = join(workspace, "plain");
+    await cp(join(ROOT, "sandbox"), plain, { recursive: true });
+    await rm(join(plain, "trove.yaml"));
+    await rm(target, { recursive: true, force: true, maxRetries: 5 });
+    await migrateArchive({ cwd: workspace, source: plain, target });
+    expect(await changed()).toBe(false);
+
+    await Bun.write(join(plain, "notes.txt"), "a new file\n");
+    expect(await changed()).toBe(true);
   });
 });

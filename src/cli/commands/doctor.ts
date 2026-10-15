@@ -1,3 +1,4 @@
+import type { SourceHealth } from "../../core/migrate/drift.ts";
 import { diagnose, type StoreHealth } from "../../core/store/doctor.ts";
 import { parse } from "../args.ts";
 import { type Command, EXIT } from "../command.ts";
@@ -6,6 +7,11 @@ import { formatTable } from "../format/table.ts";
 
 const yesNo = (value: boolean, paint: Paint): string =>
   value ? paint("green", "yes") : paint("yellow", "no");
+
+const sourceState = (source: SourceHealth, paint: Paint): string => {
+  if (source.changed === undefined) return paint("dim", `${source.path} (not compared)`);
+  return source.changed ? paint("yellow", `${source.path} (changed)`) : source.path;
+};
 
 const storeRows = (store: StoreHealth, paint: Paint): string[][] => [
   [paint("bold", store.name), store.root],
@@ -17,9 +23,17 @@ const storeRows = (store: StoreHealth, paint: Paint): string[][] => [
         ["  sync", store.sync ?? "off"],
         ["  documents", String(store.documents)],
         ["  errors", store.errors ? paint("red", String(store.errors)) : paint("green", "0")],
+        ...(store.source ? [["  migrated from", sourceState(store.source, paint)]] : []),
       ]
     : []),
 ];
+
+const sourceWarnings = (stores: readonly StoreHealth[]): string[] =>
+  stores.flatMap(({ name, root, source }) =>
+    source?.changed
+      ? [`! ${name}: ${source.path} changed after the last resync; run trove resync in ${root}`]
+      : [],
+  );
 
 export const doctor: Command = {
   name: "doctor",
@@ -40,6 +54,7 @@ export const doctor: Command = {
       ...health.stores.flatMap((store) => storeRows(store, paint)),
     ];
     for (const line of formatTable(rows)) io.print(line);
+    for (const warning of sourceWarnings(health.stores)) io.print(paint("yellow", warning));
     if (health.stores.length === 0)
       io.print(paint("yellow", "no stores: run trove init or trove clone"));
     const healthy = health.stores.every(

@@ -3,16 +3,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gitOrThrow } from "../git/git.ts";
-import { toPosix } from "../store/paths.ts";
-import { type Pending, sourceChanges } from "./source-status.ts";
-
-const FILES = new Bun.Glob("**/*");
-
-const allFiles = async (source: string): Promise<Pending[]> =>
-  (await Array.fromAsync(FILES.scan({ cwd: source, dot: true })))
-    .map(toPosix)
-    .filter((path) => !path.startsWith(".git/"))
-    .map((path) => ({ path, deleted: false }));
+import { sourceChanges, sourceFiles } from "./source-status.ts";
 
 /** The source's last commit, fetched into the store's repository. */
 const fetchHead = async (source: string, store: string): Promise<string> => {
@@ -31,7 +22,7 @@ export const snapshotSource = async (source: string, store: string): Promise<str
     const parent = isRepository ? await fetchHead(source, store) : undefined;
     await gitOrThrow(store, parent ? ["read-tree", parent] : ["read-tree", "--empty"], { env });
 
-    const pending = isRepository ? await sourceChanges(source) : await allFiles(source);
+    const pending = isRepository ? await sourceChanges(source) : await sourceFiles(source);
     for (const { path, deleted } of pending) {
       if (deleted) {
         await gitOrThrow(store, ["update-index", "--force-remove", "--", path], { env });

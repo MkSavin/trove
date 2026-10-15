@@ -1,19 +1,20 @@
 import { existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { CONFIG_FILE } from "../config/load.ts";
 import { TroveError } from "../errors.ts";
 import { git, gitOrThrow } from "../git/git.ts";
 import { writeReports } from "../reports/write.ts";
 import { openStore, type Store } from "../store/open.ts";
 import { commitPaths } from "../sync/git-steps.ts";
+import { asEditOf, type Change, type Move, pairMoves } from "./moves.ts";
 import { PENDING_REF, pendingState, readOrigin, recordOrigin, STATE_REF } from "./origin.ts";
 import { snapshotSource } from "./snapshot.ts";
 
 export type FileResult = {
   path: string;
-  outcome: "applied" | "conflict" | "skipped";
+  outcome: "applied" | "moved" | "conflict" | "skipped";
   detail?: string | undefined;
 };
 
@@ -35,16 +36,45 @@ const locate = (store: Store, path: string): string | undefined => {
   return existsSync(join(store.root, archived)) ? archived : undefined;
 };
 
-const changedPaths = async (store: string, from: string, to: string): Promise<string[]> =>
-  (await gitOrThrow(store, [...QUIET, "diff", "--no-renames", "--name-only", from, to]))
-    .split("\n")
+const changesBetween = async (store: string, from: string, to: string): Promise<Change[]> => {
+  const fields = (
+    await gitOrThrow(store, [...QUIET, "diff", "--no-renames", "--name-status", "-z", from, to], {
+      raw: true,
+    })
+  )
+    .split("\0")
     .filter(Boolean);
+  const changes: Change[] = [];
+  for (let i = 0; i + 1 < fields.length; i += 2) {
+    changes.push({ status: fields[i] ?? "", path: fields[i + 1] ?? "" });
+  }
+  return changes;
+};
 
 const hasMarkers = async (root: string, path: string): Promise<boolean> =>
   existsSync(join(root, path)) && CONFLICT.test(await Bun.file(join(root, path)).text());
 
 const retarget = (patch: string, from: string, to: string): string =>
   from === to ? patch : patch.replaceAll(`a/${from}`, `a/${to}`).replaceAll(`b/${from}`, `b/${to}`);
+
+const applyPatch = async (
+  store: Store,
+  patch: string,
+  target: string,
+  result: FileResult,
+): Promise<FileResult> => {
+  if (patch === "") return result;
+  const file = join(tmpdir(), `trove-resync-${process.pid}-${Date.now()}.patch`);
+  try {
+    await Bun.write(file, patch);
+    const applied = await git(store.root, ["apply", "--3way", "--whitespace=nowarn", file]);
+    if (applied.ok) return result;
+    const marked = await hasMarkers(store.root, target);
+    return { path: result.path, outcome: "conflict", detail: marked ? undefined : applied.err };
+  } finally {
+    await rm(file, { force: true });
+  }
+};
 
 const applyOne = async (
   store: Store,
@@ -56,24 +86,39 @@ const applyOne = async (
   const patch = await gitOrThrow(
     store.root,
     [...QUIET, "diff", "--binary", base, now, "--", path],
-    {
-      raw: true,
-    },
+    { raw: true },
   );
   const deleted = !(await git(store.root, ["cat-file", "-e", `${now}:${path}`])).ok;
   if (deleted && !locate(store, path)) return { path, outcome: "skipped", detail: "already gone" };
+  const shown = target === path ? path : `${path} → ${target}`;
+  return applyPatch(store, retarget(patch, path, target), target, {
+    path: shown,
+    outcome: "applied",
+  });
+};
 
-  const file = join(tmpdir(), `trove-resync-${process.pid}-${Date.now()}.patch`);
-  try {
-    await Bun.write(file, retarget(patch, path, target));
-    const applied = await git(store.root, ["apply", "--3way", "--whitespace=nowarn", file]);
-    const shown = target === path ? path : `${path} → ${target}`;
-    if (applied.ok) return { path: shown, outcome: "applied" };
-    const marked = await hasMarkers(store.root, target);
-    return { path: shown, outcome: "conflict", detail: marked ? undefined : applied.err };
-  } finally {
-    await rm(file, { force: true });
+/** The store follows a move the source made across the archive mirror, keeping its own edits. */
+const applyMove = async (
+  store: Store,
+  base: string,
+  now: string,
+  { from, to }: Move,
+): Promise<FileResult> => {
+  const path = `${from} → ${to}`;
+  const movedAlready = existsSync(join(store.root, to));
+  if (!movedAlready && !existsSync(join(store.root, from))) {
+    return { path, outcome: "skipped", detail: "gone from the store" };
   }
+  if (!movedAlready) {
+    await mkdir(dirname(join(store.root, to)), { recursive: true });
+    await gitOrThrow(store.root, ["mv", from, to]);
+  }
+  const patch = await gitOrThrow(
+    store.root,
+    [...QUIET, "diff", "--binary", `${base}:${from}`, `${now}:${to}`],
+    { raw: true },
+  );
+  return applyPatch(store, patch && asEditOf(patch, to), to, { path, outcome: "moved" });
 };
 
 const rebuildAndCommit = async (
@@ -110,16 +155,18 @@ export const resyncStore = async (store: Store, source?: string): Promise<Resync
     ...origin.drop,
     ...Object.values(store.config.reports).map((report) => report.output),
   ]);
-  const paths = (await changedPaths(store.root, origin.state, now)).filter(
-    (path) => !keep.has(path),
+  const changes = (await changesBetween(store.root, origin.state, now)).filter(
+    (change) => !keep.has(change.path),
   );
-  if (paths.length === 0) {
+  if (changes.length === 0) {
     await gitOrThrow(store.root, ["update-ref", STATE_REF, now]);
     return { source: origin.source, files: [], commit: undefined, upToDate: true };
   }
 
+  const { moves, rest } = pairMoves(changes, store.config.archive.folder);
   const files: FileResult[] = [];
-  for (const path of paths) files.push(await applyOne(store, origin.state, now, path));
+  for (const move of moves) files.push(await applyMove(store, origin.state, now, move));
+  for (const path of rest) files.push(await applyOne(store, origin.state, now, path));
   if (files.some((file) => file.outcome === "conflict")) {
     await gitOrThrow(store.root, ["update-ref", PENDING_REF, now]);
     return { source: origin.source, files, commit: undefined, upToDate: false };

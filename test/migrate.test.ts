@@ -3,11 +3,12 @@ import { existsSync } from "node:fs";
 import { cp, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { run } from "../src/cli/run.ts";
 import { git } from "../src/core/git/git.ts";
 import { inferConfig } from "../src/core/migrate/infer.ts";
 import { migrateArchive } from "../src/core/migrate/migrate.ts";
 import { openStore, parseConfig, runRules } from "../src/index.ts";
-import { ROOT } from "./helpers.ts";
+import { captureIo, ROOT } from "./helpers.ts";
 
 let workspace = "";
 let archive = "";
@@ -110,6 +111,28 @@ describe("migrate", () => {
       link: true,
     });
     expect(await Bun.file(join(project, ".trove.yaml")).text()).toContain("path: ../notes-trove");
+  });
+
+  test("leaves the archive's remote off the store, says how to add one and what is unpushed", async () => {
+    const origin = join(workspace, "origin.git");
+    await git(workspace, ["init", "--quiet", "--bare", origin]);
+    await git(archive, ["remote", "add", "origin", origin]);
+    await git(archive, ["push", "--quiet", "origin", "HEAD"]);
+    await Bun.write(join(archive, "specs", "SPEC_LOCAL.md"), "not pushed\n");
+    await git(archive, ["add", "specs/SPEC_LOCAL.md"]);
+    await git(archive, ["commit", "--quiet", "-m", "docs: local only"]);
+
+    const io = captureIo(workspace);
+    await run(["migrate", "notes", "notes-trove"], io);
+    expect((await git(join(workspace, "notes-trove"), ["remote"])).out).toBe("");
+    expect(io.stdout()).toContain(`! not pushed to ${origin}: 1 archive commits`);
+    expect(io.stdout()).toContain("trove remote add <new-url>");
+    expect(io.stdout()).toContain(`trove remote add ${origin}`);
+  });
+
+  test("an archive without a remote gets no remote advice", async () => {
+    const result = await migrateArchive({ cwd: workspace, source: "notes", target: "notes-trove" });
+    expect(result.sourceRemote).toBeUndefined();
   });
 
   test("refuses a target that is not empty", async () => {

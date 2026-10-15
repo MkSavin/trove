@@ -1,11 +1,22 @@
 import { TroveError } from "../../core/errors.ts";
 import { migrateArchive } from "../../core/migrate/migrate.ts";
+import type { SourceRemote } from "../../core/migrate/source-remote.ts";
 import { isLanguage, LANGUAGES } from "../../core/presets/presets.ts";
 import { parse } from "../args.ts";
 import { type Command, EXIT } from "../command.ts";
 import { countSeverities, formatCounts } from "../format/diagnostics.ts";
 import { painter } from "../format/style.ts";
 import { formatTable } from "../format/table.ts";
+
+const remoteAdvice = ({ url, unpushed }: SourceRemote): string[] => [
+  ...(unpushed > 0
+    ? [`  ! not pushed to ${url}: ${unpushed} archive commits; the store has them, the remote not`]
+    : []),
+  `  ! no remote set: the store continues the archive's history, so pushing it to ${url}`,
+  "    would turn that repository into the store for everyone who still writes to the archive",
+  "    give the store its own repository: trove remote add <new-url>",
+  `    or, once the archive is sealed (trove resync --seal): trove remote add ${url}`,
+];
 
 export const migrate: Command = {
   name: "migrate",
@@ -58,6 +69,9 @@ export const migrate: Command = {
     }
     for (const note of result.notes) io.print(paint("yellow", `  ! ${note}`));
     for (const lost of result.lost) io.print(paint("red", `  ✖ ${lost}`));
+    if (result.sourceRemote) {
+      for (const line of remoteAdvice(result.sourceRemote)) io.print(paint("yellow", line));
+    }
     io.print(
       result.lost.length === 0
         ? paint("green", "✔ every document and item came over")

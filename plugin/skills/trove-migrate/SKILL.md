@@ -20,12 +20,13 @@ The original archive is someone's working folder: only read it. Everything happe
 3. **Read the report.** Every count must match; `✖` lines mean something was lost, stop and investigate. Notes list types, statuses and fields trove added to the config; decide with the user whether they are real or typos to fix.
 4. **Check.** `trove check` in the new store. Errors are real problems in the documents; fix them with trove operations, not by loosening rules. Turn a rule off or set `since:` only when the user decides old documents are exempt.
 5. **Point the instructions at trove.** The store's `AGENTS.md` and prompts may describe the old workflow: replace old commands with `trove` ones and old paths with the new folder. Leave archived documents and plans as they are; they are history. Commit with `trove sync`.
-6. **Keep up while people still work in the archive.** `trove resync` in the store brings what changed there since the migration, committed or not, three-way; the store's own edits stay. Conflicts wait for `trove resync --continue`.
-7. **Connect.** `trove remote add <url>` when the store gets a remote; `trove client add <claude|cursor|codex>` in the code repository for the assistant.
-8. **Verify.** `trove doctor` from the code repository shows the store, its health and its sync mode.
+6. **Keep up while people still work in the archive.** `trove resync` in the store brings what changed there since the migration, committed or not, three-way; the store's own edits stay. Conflicts wait for `trove resync --continue`. `trove doctor` warns when the archive changed after the last resync.
+7. **Seal when the move is done.** Once the user says nobody works in the archive any more, `trove resync --seal` brings the last changes, then writes `MOVED.md` and a first line in the archive's `AGENTS.md` saying where the store is, and commits them there.
+8. **Connect.** The store gets no remote at migration; `migrate` prints the archive's one. Give the store its own repository with `trove remote add <url>`; reuse the archive's remote only after sealing, since the push turns that repository into the store for everyone. `trove client add <claude|cursor|codex>` in the code repository for the assistant.
+9. **Verify.** `trove doctor` from the code repository shows the store, its health, its sync mode and whether the archive moved on.
 
 ## Do not
 
-- Write anything into the original archive, including `git` commands that change its index.
+- Write anything into the original archive, including `git` commands that change its index; `trove resync --seal` is the one exception, and only when the user asks for it.
 - Rewrite documents to satisfy new rules in bulk.
 - Commit into the store with git directly; use trove.
