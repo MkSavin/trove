@@ -7,7 +7,7 @@ import { formatRow } from "../edit/ledger.ts";
 import { applyPatches, eolOf, insert, type Patch } from "../edit/patch.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { fillTemplate, type NewDocument, renderNewDocument } from "../templates/new-document.ts";
-import { customTemplate, initialStatus } from "./doc-new.ts";
+import { customTemplate, initialStatus, STANDARD } from "./doc-new.ts";
 
 const TITLE = / — (.+)$/;
 
@@ -28,7 +28,7 @@ const baseTitle = (base: Document): string => {
   return TITLE.exec(title)?.[1] ?? stemOf(base);
 };
 
-/** A new companion: the store's template for its type when there is one, else the built-in. */
+/** A new companion with the base's values for its required fields; the store's template for its type when there is one. */
 export const newCompanion = async (
   index: StoreIndex,
   base: Document,
@@ -36,7 +36,14 @@ export const newCompanion = async (
 ): Promise<Document> => {
   const rel = companionRel(base, type);
   const specs = fieldSpecs(index.config, index.config.types[type]);
-  const given: Record<string, string | undefined> = { base: base.name, scope: base.meta.scope };
+  const inherited = Object.keys(specs).filter(
+    (key) => specs[key]?.required && !STANDARD.has(key) && base.meta[key] !== undefined,
+  );
+  const given: Record<string, string | undefined> = {
+    ...Object.fromEntries(inherited.map((key) => [key, base.meta[key]])),
+    base: base.name,
+    scope: base.meta.scope,
+  };
   const document: NewDocument = {
     type,
     name: posix.basename(rel, ".md"),

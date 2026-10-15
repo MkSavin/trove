@@ -14,7 +14,7 @@ export type NewDocumentInput = {
   fields?: Readonly<Record<string, string>> | undefined;
 };
 
-const STANDARD = new Set(["type", "status", "date", "checked"]);
+export const STANDARD = new Set(["type", "status", "date", "checked"]);
 
 export const initialStatus = (index: StoreIndex, type: string): string => {
   const kind = index.config.types[type];

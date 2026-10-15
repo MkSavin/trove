@@ -160,6 +160,21 @@ describe("item close", () => {
     expect(text).toContain("### DEBT-S1. Presence fan-out per team (done, a1b2c3d)");
   });
 
+  test("the item's own heading wins over an earlier one that mentions its id", async () => {
+    const store = await sandbox();
+    const mention = "### DEBT-S1. Presence fan-out per team, then DEBT-S2 (open)";
+    const text = (await read(store, "DEBT.md")).replace(
+      "### DEBT-S1. Presence fan-out per team (open)",
+      mention,
+    );
+    await Bun.write(join(store.root, "DEBT.md"), text);
+    const next = await reopen(store);
+    await apply(next, closeItem(next.index, "DEBT-S2"));
+    const closed = await read(store, "DEBT.md");
+    expect(closed).toContain(mention);
+    expect(closed).toContain("### DEBT-S2. Search index in its own service (done)");
+  });
+
   test("keeps CRLF line breaks", async () => {
     const store = await sandbox();
     const rel = "audits/AUDIT_API_2.md";

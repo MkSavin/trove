@@ -15,9 +15,17 @@ export const findDocument = (index: StoreIndex, name: string): Document | undefi
 export const idToken = (id: string): RegExp =>
   new RegExp(`(?:^|[^\\w-])${RegExp.escape(id)}(?![\\w-])`);
 
+/** `WEB1-3. Title` or `` `WEB1-3` — note ``: a heading that starts with the id. */
+const startsWithId = (id: string): RegExp => new RegExp(`^\`?${RegExp.escape(id)}\`?(?![\\w-])`);
+
+/** The heading that starts with the id; one that only mentions it is a fallback. */
 export const itemHeading = (doc: Document, id: string): Heading | undefined => {
+  const own = startsWithId(id);
   const token = idToken(id);
-  return doc.headings.find((heading) => token.test(heading.title));
+  return (
+    doc.headings.find((heading) => own.test(heading.title)) ??
+    doc.headings.find((heading) => token.test(heading.title))
+  );
 };
 
 const findHeading = (doc: Document, query: string): Heading | undefined => {
@@ -43,9 +51,6 @@ export const resolveRef = (index: StoreIndex, ref: string): Resolved | undefined
   if (!item || !home) return undefined;
   return { kind: "item", item, document: home, heading: itemHeading(home, item.id) };
 };
-
-/** `WEB1-3. Title` or `` `WEB1-3` — note ``: a heading that starts with the id. */
-const startsWithId = (id: string): RegExp => new RegExp(`^\`?${RegExp.escape(id)}\`?(?![\\w-])`);
 
 /** Sections titled by the id in any document, archive included, when no ledger holds it. */
 export const sectionsTitled = (index: StoreIndex, id: string): Resolved[] => {
