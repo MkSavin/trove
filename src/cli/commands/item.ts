@@ -73,7 +73,7 @@ const itemMove: Command = {
     const [id, target] = positionals;
     if (!id || !target) throw new TroveError("item move needs an id and a target document");
     const store = await openFromFlags(values, io);
-    const plan = moveItem(store.index, id, target, {
+    const plan = await moveItem(store.index, id, target, {
       archive: values.archive,
       section: values.section,
     });

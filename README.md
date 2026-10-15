@@ -87,7 +87,7 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 | `trove item add <doc> column=value...` | A ledger row with the next free id and a section stub (`ledger.heading`, `ledger.stub`). Numbers of closed items are never reused. |
 | `trove item close <id> [--as OUTCOME] [--commit SHA] [--archive]` | Drop the row and list other mentions. A type with `closeInto` moves the row and the section into its resolved companion; others mark the section closed in place. `--as` names the outcome (`fixed`, `dropped`, `moved`); `--archive` when it was the last open item. |
 | `trove item defer <id>` | Status cell and section note to deferred. |
-| `trove item move <id> <doc> [--archive]` | Move an item with its section to another ledger under the next id there; columns the target lacks are reported. |
+| `trove item move <id> <doc> [--archive]` | Move an item with its section to another ledger under the next id there; columns the target lacks are reported. A source with `closeInto` and a `moved` outcome keeps a row in its closed ledger that names the new id. |
 | `trove links [file] --fix` | Dead links into code that git deleted point at its last version: a permalink at the parent of the deleting commit when `origin` is on GitHub or GitLab and has it, otherwise a `*(deleted in abc1234)*` note after the link that `dead-link` checks at that commit. Links never in git history stay and are listed. |
 | `trove sync [-m TEXT]` | Commit hand edits together with rebuilt reports, then push by mode. Refuses while `check` is red. |
 

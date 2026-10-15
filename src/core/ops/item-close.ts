@@ -61,14 +61,25 @@ const closedSection = (
   return [marked, ...body].join(eolOf(target.text));
 };
 
-/** Moves the row and the section into the base document's `resolved-of` companion. */
-const closeInto = async (
+export type Outcome = { label: string; note: string };
+
+export type ClosedRecord = {
+  companion: Change;
+  /** Sets the base's link to a companion it does not name yet. */
+  backLink: Patch[];
+};
+
+/**
+ * The item's row, and its section when `section` is given, added to the closed ledger of the
+ * base document's `resolved-of` companion, which is created when missing.
+ */
+export const recordClosed = async (
   index: StoreIndex,
   { doc, ledger, table, row, item }: LocatedItem,
   type: string,
-  outcome: { label: string; note: string },
-): Promise<Change[]> => {
-  const heading = itemHeading(doc, item.id);
+  outcome: Outcome,
+  { section, what }: { section?: string | undefined; what?: string | undefined } = {},
+): Promise<ClosedRecord> => {
   const split = (doc.ledger?.tables.filter((candidate) => candidate.header).length ?? 0) > 1;
   const sectionHeading = split
     ? doc.headings.findLast((h) => h.title === table.section && h.line < row.line.number)
@@ -87,10 +98,12 @@ const closeInto = async (
   );
   if (!target) throw new TroveError(`${companion.rel} has no table for closed items`);
 
-  const cells = target.keys.map((key) =>
-    key === "status" ? outcome.label : key ? (item.values[key] ?? "") : "",
-  );
-  const section = heading ? doc.text.slice(heading.start, heading.end).trimEnd() : undefined;
+  const values: Readonly<Record<string, string>> = {
+    ...item.values,
+    status: outcome.label,
+    ...(what ? { what } : {}),
+  };
+  const cells = target.keys.map((key) => (key ? (values[key] ?? "") : ""));
   const moved = section
     ? `${closedSection(section, outcome.note, ledger, companion)}${eolOf(companion.text)}`
     : undefined;
@@ -102,15 +115,29 @@ const closeInto = async (
 
   const linksBack =
     Object.hasOwn(fieldSpecs(index.config, doc.typeConfig), type) && doc.meta[type] === undefined;
+  return {
+    companion: { rel: companion.rel, text: companionText },
+    backLink: linksBack ? [setField(doc, type, companion.name)] : [],
+  };
+};
+
+/** Moves the row and the section into the base document's `resolved-of` companion. */
+const closeInto = async (
+  index: StoreIndex,
+  located: LocatedItem,
+  type: string,
+  outcome: Outcome,
+): Promise<Change[]> => {
+  const { doc, row, item } = located;
+  const heading = itemHeading(doc, item.id);
+  const section = heading ? doc.text.slice(heading.start, heading.end).trimEnd() : undefined;
+  const { companion, backLink } = await recordClosed(index, located, type, outcome, { section });
   const baseText = applyPatches(doc.text, [
     removeRow(doc, row),
     ...(heading ? [replace({ start: heading.start, end: heading.end }, "")] : []),
-    ...(linksBack ? [setField(doc, type, companion.name)] : []),
+    ...backLink,
   ]);
-  return [
-    { rel: doc.rel, text: baseText },
-    { rel: companion.rel, text: companionText },
-  ];
+  return [{ rel: doc.rel, text: baseText }, companion];
 };
 
 const markInPlace = ({ doc, ledger, row, item }: LocatedItem, note: string): Change[] => {

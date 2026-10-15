@@ -1,14 +1,17 @@
-import { parseDocument, stemOf } from "../document/document.ts";
+import { labelOf } from "../config/vocabulary.ts";
+import { stemOf } from "../document/document.ts";
 import { appendRow, removeRow } from "../edit/ledger.ts";
 import { applyPatches, eolOf, insert, replace } from "../edit/patch.ts";
 import { TroveError } from "../errors.ts";
-import { indexDocuments, type StoreIndex } from "../index/index.ts";
+import type { StoreIndex } from "../index/index.ts";
 import { idToken, itemHeading } from "../index/resolve.ts";
 import { archivePlan } from "./doc-archive.ts";
-import { mentionsOf, requireDocument, requireItem } from "./find.ts";
+import { type LocatedItem, mentionsOf, requireDocument, requireItem } from "./find.ts";
 import { idPrefix, nextNumber } from "./ids.ts";
 import { pickTable, sectionInsert, sectionLevel, sectionOffset } from "./item-add.ts";
+import { recordClosed } from "./item-close.ts";
 import type { Plan } from "./plan.ts";
+import { thenPlan } from "./with-changes.ts";
 
 const HEADING_MARKS = /^#+/;
 
@@ -21,17 +24,29 @@ const renumber = (section: string, id: string, newId: string, level: number): st
   return [renamed, ...body].join("\n");
 };
 
+const MOVED = "moved";
+
+/** With a `moved` outcome, the source's companion keeps a row that says where the item went. */
+const movedRecord = async (index: StoreIndex, located: LocatedItem, newId: string) => {
+  const type = located.doc.typeConfig?.closeInto;
+  if (!type || !Object.hasOwn(located.ledger.closed, MOVED)) return undefined;
+  const label = labelOf(located.ledger.closed, MOVED);
+  const what = `${located.item.values.what ?? ""} → ${newId}`.trim();
+  return recordClosed(index, located, type, { label, note: label }, { what });
+};
+
 /**
  * Moves an item to another ledger: its row and section leave the source, the target gets them
  * under its next id. Columns the target table lacks are dropped and reported.
  */
-export const moveItem = (
+export const moveItem = async (
   index: StoreIndex,
   id: string,
   targetName: string,
   options: { archive?: boolean | undefined; section?: string | undefined } = {},
-): Plan => {
-  const { doc: source, row, item } = requireItem(index, id);
+): Promise<Plan> => {
+  const located = requireItem(index, id);
+  const { doc: source, row, item } = located;
   const target = requireDocument(index, targetName);
   const ledger = target.ledger?.config;
   if (!ledger) throw new TroveError(`${target.rel} has no ledger`);
@@ -47,9 +62,11 @@ export const moveItem = (
 
   const heading = itemHeading(source, id);
   const section = heading ? source.text.slice(heading.start, heading.end).trimEnd() : undefined;
+  const record = await movedRecord(index, located, newId);
   const sourceText = applyPatches(source.text, [
     removeRow(source, row),
     ...(heading ? [replace({ start: heading.start, end: heading.end }, "")] : []),
+    ...(record?.backLink ?? []),
   ]);
 
   const eol = eolOf(target.text);
@@ -67,26 +84,20 @@ export const moveItem = (
     ...(mentions.length > 0 ? [`${id} is still mentioned in ${mentions.join(", ")}`] : []),
   ];
   const message = `docs: move ${id} to ${newId}`;
-  const targetChange = { rel: target.rel, text: targetText };
-  if (!options.archive) {
-    return { changes: [{ rel: source.rel, text: sourceText }, targetChange], notes, message };
-  }
+  const changes = [
+    { rel: source.rel, text: sourceText },
+    { rel: target.rel, text: targetText },
+    ...(record ? [record.companion] : []),
+  ];
+  const plan: Plan = { changes, notes, message };
+  if (!options.archive) return plan;
 
-  const reparse = (rel: string, path: string, text: string) =>
-    parseDocument({ path, rel, text }, index.config);
-  const emptied = reparse(source.rel, source.path, sourceText);
-  const updated = reparse(target.rel, target.path, targetText);
-  const replaced = index.documents.map((doc) =>
-    doc.rel === source.rel ? emptied : doc.rel === target.rel ? updated : doc,
-  );
-  const archived = archivePlan(
-    indexDocuments(index.root, index.config, replaced, index.today),
-    emptied,
-  );
-  const touchesTarget = archived.changes.some((change) => change.rel === target.rel);
   return {
-    changes: touchesTarget ? archived.changes : [...archived.changes, targetChange],
-    notes,
+    ...thenPlan(index, plan, (after) => {
+      const emptied = after.byRel.get(source.rel);
+      if (!emptied) throw new TroveError(`${source.rel} is gone`);
+      return archivePlan(after, emptied);
+    }),
     message: `${message}, archive ${stemOf(source)}`,
   };
 };

@@ -34,7 +34,7 @@ afterEach(async () => {
 describe("item move", () => {
   test("moves the row and the section under the target's next id", async () => {
     const store = await sandbox();
-    const plan = moveItem(store.index, "WEB1-6", "AUDIT_API_2");
+    const plan = await moveItem(store.index, "WEB1-6", "AUDIT_API_2");
     expect(plan.notes).toEqual([
       "WEB1-6 → API2-5",
       "not in the target table, dropped: module",
@@ -46,6 +46,9 @@ describe("item move", () => {
     const web = await read(store, "audits/AUDIT_WEB_1.md");
     expect(web).not.toContain("| WEB1-6 |");
     expect(web).not.toContain("### WEB1-6.");
+    expect(await read(store, "audits/AUDIT_WEB_1.RESOLVED.md")).toContain(
+      "| WEB1-6 | P2 | notifications | product | moved | No agreed rule for which mentions notify on mobile and web at the same time → API2-5 |",
+    );
     const api = await read(store, "audits/AUDIT_API_2.md");
     expect(lineDiff(before, api).map((line) => `${line.kind}${line.text}`)).toEqual([
       "+| API2-5 | P2 | product | open | No agreed rule for which mentions notify on mobile and web at the same time |",
@@ -58,18 +61,23 @@ describe("item move", () => {
 
   test("can archive a source left without open items", async () => {
     const store = await sandbox();
-    const first = await applyPlan(store, moveItem(store.index, "MOB1-1", "AUDIT_API_2"));
+    const first = await applyPlan(store, await moveItem(store.index, "MOB1-1", "AUDIT_API_2"));
     expect(first.introduced).toEqual([]);
     const next = await openStore({ cwd: store.root, store: store.root, today: TODAY });
-    const refused = await applyPlan(next, moveItem(next.index, "MOB1-2", "AUDIT_API_2"));
+    const refused = await applyPlan(next, await moveItem(next.index, "MOB1-2", "AUDIT_API_2"));
     expect(refused.introduced.map((d) => d.rule)).toEqual(["lifecycle"]);
     const done = await applyPlan(
       next,
-      moveItem(next.index, "MOB1-2", "AUDIT_API_2", { archive: true }),
+      await moveItem(next.index, "MOB1-2", "AUDIT_API_2", { archive: true }),
     );
     expect(done.introduced).toEqual([]);
     expect(
       await Bun.file(join(store.root, ".archive/audits/mobile/AUDIT_MOBILE_1.md")).exists(),
+    ).toBe(true);
+    expect(
+      await Bun.file(
+        join(store.root, ".archive/audits/mobile/AUDIT_MOBILE_1.RESOLVED.md"),
+      ).exists(),
     ).toBe(true);
   });
 });
