@@ -67,13 +67,13 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 | command | does |
 | ------- | ---- |
 | `trove check [file] [--all] [--json]` | Run every rule; exits 1 on errors. `--all` also lists every document. |
-| `trove query items status=open owner=web` | Filter items or documents by any field (see filters below). |
+| `trove query items status=open owner=web [--columns a,b]` | Filter items or documents by any field (see filters below). Items show the columns of the ledgers they come from, `id` first; `--columns` picks others. |
 | `trove summary show [kind] [filters]` | A summary on screen, nothing written: a configured kind, or counts, open items by document and documents in work under the given filters. |
 | `trove show WEB1-4` | Print one item's section. Also takes `DOC#heading`, or a document name for its outline. |
 | `trove prompt PROMPT_X [--copy]` | Print a prompt's task text, or copy it; Cyrillic survives on Windows too. |
 | `trove report [name...]` · `trove rules` | Rebuild generated documents · list rules with their effective level. |
 | `trove links [--dead]` | Relative links to documents and code; code is checked under `roots` present on this machine, in the checkout or, with `{ path, ref: origin/main }`, at that commit whatever branch is checked out. |
-| `trove export items [filters] --format csv\|json` | Rows for a CRM or a spreadsheet; RFC 4180 CSV. |
+| `trove export items [filters] --format csv\|json [--columns a,b]` | Rows for a CRM or a spreadsheet; RFC 4180 CSV. |
 
 **Edit.** Every edit patches only its own lines, keeps CRLF, is checked in memory first and is not written if it adds an error. Generated reports are rebuilt in the same step; `--dry-run` prints the line diff instead.
 

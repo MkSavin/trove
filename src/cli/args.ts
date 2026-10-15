@@ -8,6 +8,21 @@ export const STORE_OPTIONS = {
   config: { type: "string" },
 } as const satisfies ParseArgsOptionsConfig;
 
+/** `--columns`, with `--fields` kept as its older name. */
+export const COLUMN_OPTIONS = {
+  columns: { type: "string" },
+  fields: { type: "string" },
+} as const satisfies ParseArgsOptionsConfig;
+
+export const requestedColumns = (values: {
+  columns?: string | undefined;
+  fields?: string | undefined;
+}): string[] | undefined =>
+  (values.columns ?? values.fields)
+    ?.split(",")
+    .map((column) => column.trim())
+    .filter(Boolean);
+
 export const parse = <const Options extends ParseArgsOptionsConfig>(
   argv: readonly string[],
   options: Options,

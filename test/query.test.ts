@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
+import { queryRows } from "../src/core/index/rows.ts";
 import { compareNatural } from "../src/core/text/compare.ts";
-import { resolveRef, sectionText, selectDocuments, selectItems } from "../src/index.ts";
-import { openFixture } from "./helpers.ts";
+import { openStore, resolveRef, sectionText, selectDocuments, selectItems } from "../src/index.ts";
+import { openFixture, ROOT, TODAY } from "./helpers.ts";
 
 const { index } = await openFixture();
+const SANDBOX = join(ROOT, "sandbox");
+const store = await openStore({ cwd: SANDBOX, store: SANDBOX, today: TODAY });
 
 describe("selectItems", () => {
   test("matches a vocabulary field by key or by label", () => {
@@ -22,6 +26,43 @@ describe("selectItems", () => {
       status: "открыто",
       what: "Server item without a module column",
     });
+  });
+});
+
+describe("queryRows", () => {
+  test("shows only the columns of the ledgers the matched items come from", () => {
+    const audits = queryRows(store.index, "items", { type: ["audit"] });
+    expect(audits.fields).toEqual([
+      "id",
+      "priority",
+      "module",
+      "owner",
+      "status",
+      "what",
+      "document",
+    ]);
+    expect(audits.rows[0]).not.toHaveProperty("plan");
+
+    const debt = queryRows(store.index, "items", { type: ["debt"] });
+    expect(debt.fields).toEqual(["id", "status", "what", "plan", "document"]);
+
+    const both = queryRows(store.index, "items", { type: ["audit", "debt"] });
+    expect(both.fields).toEqual([
+      "id",
+      "priority",
+      "module",
+      "owner",
+      "status",
+      "what",
+      "plan",
+      "document",
+    ]);
+  });
+
+  test("keeps the requested columns as given", () => {
+    const { fields, rows } = queryRows(store.index, "items", { type: ["debt"] }, ["what", "id"]);
+    expect(fields).toEqual(["what", "id"]);
+    expect(Object.keys(rows[0] ?? {})).toEqual(["what", "id"]);
   });
 });
 
