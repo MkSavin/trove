@@ -18,6 +18,7 @@ import { copySource } from "./copy.ts";
 import { inferConfig } from "./infer.ts";
 import { type Inventory, inventoryChanges, takeInventory } from "./inventory.ts";
 import { recordOrigin } from "./origin.ts";
+import { readSourceRemote, type SourceRemote } from "./source-remote.ts";
 
 export type MigrateOptions = {
   cwd: string;
@@ -44,6 +45,8 @@ export type MigrateResult = {
   lost: readonly string[];
   diagnostics: readonly Diagnostic[];
   commits: readonly string[];
+  /** The archive's origin, never set on the store: pushing there would publish the store over it. */
+  sourceRemote: SourceRemote | undefined;
 };
 
 const ensureFreshTarget = async (target: string): Promise<void> => {
@@ -148,5 +151,6 @@ export const migrateArchive = async (options: MigrateOptions): Promise<MigrateRe
     lost: inventoryChanges(before, inventory),
     diagnostics: runRules(store.rules, store.index),
     commits,
+    sourceRemote: copied.history ? await readSourceRemote(source) : undefined,
   };
 };
