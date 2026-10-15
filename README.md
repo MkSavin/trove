@@ -67,19 +67,19 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 | command | does |
 | ------- | ---- |
 | `trove check [file] [--all] [--json]` | Run every rule; exits 1 on errors. `--all` also lists every document. |
-| `trove query items status=open owner=web` | Filter items or documents by any field (see filters below). |
+| `trove query items status=open owner=web [--columns a,b]` | Filter items or documents by any field (see filters below). Items show the columns of the ledgers they come from, `id` first; `--columns` picks others. |
 | `trove summary show [kind] [filters]` | A summary on screen, nothing written: a configured kind, or counts, open items by document and documents in work under the given filters. |
 | `trove show WEB1-4` | Print one item's section, a closed one too; when no ledger holds the id, every section titled by it, archive included. Also takes `DOC#heading`, or a document name for its outline. |
 | `trove prompt PROMPT_X [--copy]` | Print a prompt's task text, or copy it; Cyrillic survives on Windows too. |
 | `trove report [name...]` · `trove rules` | Rebuild generated documents · list rules with their effective level. |
 | `trove links [--dead]` | Relative links to documents and code; code is checked under `roots` present on this machine, in the checkout or, with `{ path, ref: origin/main }`, at that commit whatever branch is checked out. `--dead` ends with `N dead of M links`. |
-| `trove export items [filters] --format csv\|json` | Rows for a CRM or a spreadsheet; RFC 4180 CSV. |
+| `trove export items [filters] --format csv\|json [--columns a,b]` | Rows for a CRM or a spreadsheet; RFC 4180 CSV. |
 
 **Edit.** Every edit patches only its own lines, keeps CRLF, is checked in memory first and is not written if it adds an error. Generated reports are rebuilt in the same step; `--dry-run` prints the line diff instead.
 
 | command | does |
 | ------- | ---- |
-| `trove doc new <type> <topic> [--scope] [--field k=v]` | A document from the type's template: folder, prefix, next series number, slug. |
+| `trove doc new <type> <topic> [--scope] [--field k=v]` | A document from the type's template: folder, prefix, next series number, slug. The name is the topic's first eight words in capitals, Cyrillic transliterated (`чего не хватает` → `CHEGO_NE_KHVATAET`); other scripts need `--name`. |
 | `trove doc archive <doc>` | Move into the archive mirror, set the status, fix relative links on both sides. |
 | `trove doc retype <doc> <type>` | Turn a document into another type, e.g. research that became a plan of work: folder, prefix, status, title, links and references follow. |
 | `trove summary new <kind> [filters] [--name]` | A dated summary document of that kind: its generated blocks filled, `<!-- write: … -->` places left for the analysis. |
@@ -204,7 +204,7 @@ reports:
       - { from: items, where: { status: open }, groupBy: owner, sort: [id], columns: [id, what, document] }
 ```
 
-`trove init` writes a complete config from the [English or Russian preset](src/core/presets). The schema lives in [`src/core/config/schema.ts`](src/core/config/schema.ts); cross-references, such as a folder naming an unknown type, are reported before any document is read. `ignore` takes file names (`CONTRIBUTING.md`) and path globs (`notes/**`); `archive.finished` lists statuses a document may keep in the archive besides `archived`, such as `done` or `dropped`. A type's `initial` sets the status of new documents, and `templates: <folder>` with a `<type>.md` inside replaces the built-in template (`{{name}}`, `{{title}}`, `{{status}}`, `{{date}}` and any header field).
+`trove init` writes a complete config from the [English or Russian preset](src/core/presets). The schema lives in [`src/core/config/schema.ts`](src/core/config/schema.ts); cross-references, such as a folder naming an unknown type, are reported before any document is read. `ignore` takes file names (`CONTRIBUTING.md`) and path globs (`notes/**`); `archive.finished` lists statuses a document may keep in the archive besides `archived`, such as `done` or `dropped`. A type's `initial` sets the status of new documents, and `templates: <folder>` with a `<type>.md` inside replaces the built-in template (`{{name}}`, `{{title}}`, `{{status}}`, `{{date}}` and any header field; a field that was not given is left empty, and a placeholder that is not a field is refused).
 
 ### Summaries
 

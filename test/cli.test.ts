@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import packageJson from "../package.json" with { type: "json" };
 import { run } from "../src/cli/run.ts";
-import { captureIo, FIXTURE } from "./helpers.ts";
+import { captureIo, FIXTURE, ROOT } from "./helpers.ts";
 
 const STORE = ["--store", FIXTURE];
 
@@ -43,6 +44,23 @@ describe("trove", () => {
     const io = captureIo();
     expect(await run(["report", ...STORE], io)).toBe(1);
     expect(io.stdout()).toContain("reports not written");
+  });
+
+  test("query prints the matched ledgers' columns or the ones asked for", async () => {
+    const sandbox = ["--store", join(ROOT, "sandbox")];
+    const fitted = captureIo();
+    await run(["query", "items", "type=debt", ...sandbox], fitted);
+    expect(fitted.stdout().split("\n")[0]?.split(/\s+/)).toEqual([
+      "id",
+      "status",
+      "what",
+      "plan",
+      "document",
+    ]);
+
+    const chosen = captureIo();
+    await run(["query", "items", "type=debt", "--columns", "id, plan", ...sandbox], chosen);
+    expect(chosen.stdout().split("\n")[0]?.split(/\s+/)).toEqual(["id", "plan"]);
   });
 
   test("query and show answer from the index", async () => {

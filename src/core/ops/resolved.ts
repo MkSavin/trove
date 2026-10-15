@@ -50,7 +50,7 @@ export const newCompanion = async (
   };
   const template = await customTemplate(index, type);
   const text = template
-    ? fillTemplate(template, document)
+    ? fillTemplate(template, document, Object.keys(specs))
     : `${renderNewDocument(index.config, document)}\n[${stemOf(base)}](${base.name})\n`;
   return parseDocument({ path: join(index.root, rel), rel, text }, index.config);
 };

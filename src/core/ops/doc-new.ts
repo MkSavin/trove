@@ -67,7 +67,7 @@ export const newDocument = async (index: StoreIndex, input: NewDocumentInput): P
   };
   const template = await customTemplate(index, input.type);
   const text = template
-    ? fillTemplate(template, document)
+    ? fillTemplate(template, document, Object.keys(specs))
     : renderNewDocument(index.config, document);
   const rel = folder ? `${folder}/${name}.md` : `${name}.md`;
   return {

@@ -38,7 +38,7 @@ describe("filters", () => {
   });
 
   test("items filter on their document's fields too", () => {
-    const rows = queryRows(
+    const { rows } = queryRows(
       store.index,
       "items",
       { path: ["!audits/AUDIT_WEB_1.md"], status: ["open"], type: ["audit"] },

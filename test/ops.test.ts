@@ -13,6 +13,7 @@ import { requireDocument } from "../src/core/ops/find.ts";
 import { addItem } from "../src/core/ops/item-add.ts";
 import { closedNote, closeItem } from "../src/core/ops/item-close.ts";
 import { deferItem } from "../src/core/ops/item-defer.ts";
+import { nameBase } from "../src/core/ops/naming.ts";
 import type { Plan } from "../src/core/ops/plan.ts";
 import { renderNewDocument } from "../src/core/templates/new-document.ts";
 import { openStore, runRules, type Store } from "../src/index.ts";
@@ -266,6 +267,41 @@ describe("doc operations", () => {
     await expect(
       newDocument(store.index, { type: "plan", topic: "offline mode", fields: { scope: "s" } }),
     ).rejects.toThrow(/PLAN_OFFLINE_MODE.md already exists/);
+  });
+
+  test("new transliterates Cyrillic topics and keeps the first words of long ones", () => {
+    expect(nameBase("Переезд архива на trove: чего не хватает")).toBe(
+      "PEREEZD_ARKHIVA_NA_TROVE_CHEGO_NE_KHVATAET",
+    );
+    expect(nameBase("Щука, ёж и съезд")).toBe("SHCHUKA_EZH_I_SEZD");
+    expect(nameBase("Їжак і ґанок, ўсё")).toBe("YIZHAK_I_GANOK_USE");
+    expect(nameBase("one two three four five six seven eight nine")).toBe(
+      "ONE_TWO_THREE_FOUR_FIVE_SIX_SEVEN_EIGHT",
+    );
+    expect(() => nameBase("東京")).toThrow(/--name/);
+  });
+
+  test("new fills a custom template, leaving optional fields empty", async () => {
+    const store = await sandbox();
+    await Bun.write(
+      join(store.root, "trove.yaml"),
+      `${await read(store, "trove.yaml")}\ntemplates: .trove/templates\n`,
+    );
+    const template = join(store.root, ".trove", "templates", "prompt.md");
+    await Bun.write(
+      template,
+      '---\ntype: {{type}}\nstatus: {{status}}\ndate: {{date}}\nchecked: {{checked}}\nscope: "{{scope}}"\nmodel: "{{model}}"\n---\n\n# {{name}} — {{title}}\n',
+    );
+    const next = await reopen(store);
+    const input = { type: "prompt", topic: "review", fields: { scope: "web/" } };
+    const [change] = (await newDocument(next.index, input)).changes;
+    expect(change?.text).toContain('scope: "web/"\nmodel: ""\n');
+    expect(change?.text).toContain("# PROMPT_REVIEW — review");
+
+    await Bun.write(template, "# {{name}} by {{reviewer}} and {{team}}\n");
+    await expect(newDocument(next.index, input)).rejects.toThrow(
+      "the prompt template uses {{reviewer}}, {{team}}, not a field of prompt",
+    );
   });
 
   test("archive moves the file, rebases its links and retargets links to it", async () => {

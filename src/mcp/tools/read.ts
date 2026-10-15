@@ -24,14 +24,17 @@ export const registerReadTools = (server: McpServer, context: Context): void => 
         store: storeField,
         kind: z.enum(KINDS),
         filters: filtersField.optional(),
-        fields: z.array(z.string()).optional().describe("Columns to return; sensible defaults"),
+        fields: z
+          .array(z.string())
+          .optional()
+          .describe("Columns to return; by default the columns of the matched items' ledgers"),
         limit: z.int().positive().optional(),
       }),
       annotations: READ_ONLY,
     },
     guarded(async ({ store, kind, filters, fields, limit }) => {
       const opened = await openFor(context, store);
-      const rows = queryRows(opened.index, kind, asFilters(filters), fields);
+      const { rows } = queryRows(opened.index, kind, asFilters(filters), fields);
       const cap = limit ?? DEFAULT_LIMIT;
       return json({ total: rows.length, rows: rows.slice(0, cap), truncated: rows.length > cap });
     }),
