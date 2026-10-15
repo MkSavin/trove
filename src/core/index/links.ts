@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { Document } from "../document/document.ts";
 import { resolveFrom } from "../edit/links.ts";
+import type { Link } from "../markdown/links.ts";
 import type { StoreIndex } from "./index.ts";
 
 export type LinkKind = "document" | "store" | "code" | "outside";
@@ -14,6 +15,8 @@ export type ResolvedLink = {
   target: string;
   kind: LinkKind;
   state: LinkState;
+  /** Commit that deleted the target; the link is checked at its parent. */
+  deletedIn?: string;
 };
 
 const decode = (path: string): string => {
@@ -29,9 +32,9 @@ const contains = (folder: string, path: string): boolean => {
   return !rel.startsWith("..") && !isAbsolute(rel);
 };
 
-type CodeRoot = { dir: string; ref: string | undefined };
+export type CodeRoot = { dir: string; ref: string | undefined };
 
-const codeRoot = (index: StoreIndex, absolute: string): CodeRoot | undefined =>
+export const codeRoot = (index: StoreIndex, absolute: string): CodeRoot | undefined =>
   Object.values(index.config.roots)
     .map(({ path, ref }) => ({ dir: resolve(index.root, path), ref }))
     .find(({ dir }) => contains(dir, absolute));
@@ -45,7 +48,7 @@ const treeAt = (index: StoreIndex, dir: string, ref: string): ReadonlySet<string
   const key = `${dir}\0${ref}`;
   if (!cache.has(key)) {
     const args = ["git", "-C", dir, "ls-tree", "-r", "-t", "-z", "--name-only", ref];
-    const listed = Bun.spawnSync(args);
+    const listed = Bun.spawnSync(args, { env: process.env });
     cache.set(
       key,
       listed.exitCode === 0
@@ -56,16 +59,30 @@ const treeAt = (index: StoreIndex, dir: string, ref: string): ReadonlySet<string
   return cache.get(key);
 };
 
-const codeState = (index: StoreIndex, root: CodeRoot, absolute: string): LinkState => {
-  if (!existsSync(root.dir)) return "unchecked";
-  if (!root.ref) return existsSync(absolute) ? "ok" : "dead";
-  const tree = treeAt(index, root.dir, root.ref);
+const stateAt = (index: StoreIndex, root: CodeRoot, absolute: string, ref: string): LinkState => {
+  const tree = treeAt(index, root.dir, ref);
   if (!tree) return "unchecked";
   const path = relative(root.dir, absolute).split(sep).join("/");
   return path === "" || tree.has(path) ? "ok" : "dead";
 };
 
-const classify = (index: StoreIndex, target: string): Pick<ResolvedLink, "kind" | "state"> => {
+const codeState = (
+  index: StoreIndex,
+  root: CodeRoot,
+  absolute: string,
+  deletedIn: string | undefined,
+): LinkState => {
+  if (!existsSync(root.dir)) return "unchecked";
+  if (deletedIn) return stateAt(index, root, absolute, `${deletedIn}^`);
+  if (!root.ref) return existsSync(absolute) ? "ok" : "dead";
+  return stateAt(index, root, absolute, root.ref);
+};
+
+const classify = (
+  index: StoreIndex,
+  target: string,
+  deletedIn: string | undefined,
+): Pick<ResolvedLink, "kind" | "state"> => {
   const absolute = resolve(index.root, target);
   if (!target.startsWith("../")) {
     const state = existsSync(absolute) ? "ok" : "dead";
@@ -73,11 +90,20 @@ const classify = (index: StoreIndex, target: string): Pick<ResolvedLink, "kind" 
   }
   const root = codeRoot(index, absolute);
   if (!root) return { kind: "outside", state: "unchecked" };
-  return { kind: "code", state: codeState(index, root, absolute) };
+  return { kind: "code", state: codeState(index, root, absolute, deletedIn) };
+};
+
+export const resolveLink = (index: StoreIndex, doc: Document, link: Link): ResolvedLink => {
+  const target = resolveFrom(doc.rel, decode(link.path));
+  const { deletedIn } = link;
+  return {
+    file: doc.rel,
+    line: link.line,
+    target,
+    ...classify(index, target, deletedIn),
+    ...(deletedIn ? { deletedIn } : {}),
+  };
 };
 
 export const resolveLinks = (index: StoreIndex, doc: Document): ResolvedLink[] =>
-  doc.links.map((link) => {
-    const target = resolveFrom(doc.rel, decode(link.path));
-    return { file: doc.rel, line: link.line, target, ...classify(index, target) };
-  });
+  doc.links.map((link) => resolveLink(index, doc, link));
