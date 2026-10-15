@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CONFIG_FILE } from "../config/load.ts";
 import { git, toplevel } from "../git/git.ts";
+import { type SourceHealth, sourceHealth } from "../migrate/drift.ts";
 import { runRules } from "../rules/run.ts";
 import { findUp } from "./locate.ts";
 import { openStore } from "./open.ts";
@@ -17,6 +18,7 @@ export type StoreHealth = {
   documents: number | undefined;
   errors: number | undefined;
   problem: string | undefined;
+  source: SourceHealth | undefined;
 };
 
 export type Health = {
@@ -34,6 +36,7 @@ const inspect = async (name: string, root: string): Promise<StoreHealth> => {
     sync: undefined,
     documents: undefined,
     errors: undefined,
+    source: undefined,
   };
   if (!existsSync(join(root, CONFIG_FILE)))
     return { ...blank, present: false, problem: "not on this machine: run trove clone" };
@@ -48,6 +51,7 @@ const inspect = async (name: string, root: string): Promise<StoreHealth> => {
       documents: store.index.documents.length,
       errors: runRules(store.rules, store.index).filter((d) => d.severity === "error").length,
       problem: undefined,
+      source: await sourceHealth(root),
     };
   } catch (error) {
     return { ...blank, present: true, problem: (error as Error).message };

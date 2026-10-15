@@ -1,6 +1,16 @@
 import { git } from "../git/git.ts";
+import { toPosix } from "../store/paths.ts";
 
 export type Pending = { path: string; deleted: boolean };
+
+const FILES = new Bun.Glob("**/*");
+
+/** Every file of a source that is not a repository. */
+export const sourceFiles = async (source: string): Promise<Pending[]> =>
+  (await Array.fromAsync(FILES.scan({ cwd: source, dot: true })))
+    .map(toPosix)
+    .filter((path) => !path.startsWith(".git/"))
+    .map((path) => ({ path, deleted: false }));
 
 /** `git status -z` entries; a rename carries its old path as the next entry. */
 const parseStatus = (output: string): Pending[] => {
