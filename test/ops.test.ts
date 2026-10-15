@@ -60,15 +60,15 @@ describe("closed note", () => {
     const ledger = (await sandbox()).config.ledger;
     if (!ledger) throw new Error("the sandbox has a ledger");
     const close = (title: string) => withHeadingNote(title, "fixed 2026-10-15", ledger);
-    expect(close("### X-1. Ollama (local)")).toBe("### X-1. Ollama (local) (fixed 2026-10-15)");
-    expect(close("### X-1. Ollama (open)")).toBe("### X-1. Ollama (fixed 2026-10-15)");
-    expect(close("### X-1. Ollama (deferred)")).toBe("### X-1. Ollama (fixed 2026-10-15)");
-    expect(close("### X-1. Ollama")).toBe("### X-1. Ollama (fixed 2026-10-15)");
-    expect(withHeadingNote("### X-1. Ollama (local)", "deferred", ledger)).toBe(
-      "### X-1. Ollama (local) (deferred)",
+    expect(close("### X-1. Cache (local)")).toBe("### X-1. Cache (local) (fixed 2026-10-15)");
+    expect(close("### X-1. Cache (open)")).toBe("### X-1. Cache (fixed 2026-10-15)");
+    expect(close("### X-1. Cache (deferred)")).toBe("### X-1. Cache (fixed 2026-10-15)");
+    expect(close("### X-1. Cache")).toBe("### X-1. Cache (fixed 2026-10-15)");
+    expect(withHeadingNote("### X-1. Cache (local)", "deferred", ledger)).toBe(
+      "### X-1. Cache (local) (deferred)",
     );
-    expect(withHeadingNote("### X-1. Ollama (open)", "deferred", ledger)).toBe(
-      "### X-1. Ollama (deferred)",
+    expect(withHeadingNote("### X-1. Cache (open)", "deferred", ledger)).toBe(
+      "### X-1. Cache (deferred)",
     );
   });
 });
@@ -399,10 +399,10 @@ describe("sections, headers and lookups", () => {
 
   test("double-quoted header values escape backslashes and quotes", async () => {
     const store = await sandbox();
-    const value = 'trove: D:\\Dev\\trove "x"';
+    const value = 'app: C:\\code\\app "x"';
     await apply(store, setDocumentField(store.index, "RISKS", "scope", value));
     const text = await read(store, "RISKS.md");
-    expect(text).toContain('scope: "trove: D:\\\\Dev\\\\trove \\"x\\""\n');
+    expect(text).toContain('scope: "app: C:\\\\code\\\\app \\"x\\""\n');
     expect(requireDocument((await reopen(store)).index, "RISKS").meta.scope).toBe(value);
     const header = text.split("---\n")[1] ?? "";
     expect((Bun.YAML.parse(header) as { scope: string }).scope).toBe(value);
