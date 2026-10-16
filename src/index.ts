@@ -38,3 +38,5 @@ export { defineRule } from "./core/rules/rule.ts";
 export { runRules, unknownRuleIds } from "./core/rules/run.ts";
 export type { OpenOptions, Store } from "./core/store/open.ts";
 export { openStore } from "./core/store/open.ts";
+export type { VerifyOptions, VerifyOutcome, VerifyResult } from "./core/verify/run.ts";
+export { verifyDocuments } from "./core/verify/run.ts";

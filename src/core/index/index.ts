@@ -4,6 +4,7 @@ import { type Document, parseDocument } from "../document/document.ts";
 import type { Item } from "../document/ledger.ts";
 import { listDocuments } from "../store/walk.ts";
 import { today } from "../text/dates.ts";
+import { readVerifications, type Verification } from "../verify/cache.ts";
 
 export type StoreIndex = {
   root: string;
@@ -14,6 +15,8 @@ export type StoreIndex = {
   items: readonly Item[];
   byName: ReadonlyMap<string, Document>;
   byRel: ReadonlyMap<string, Document>;
+  /** The last `trove check --verify` result per document on this machine. */
+  verified: ReadonlyMap<string, Verification>;
 };
 
 export const indexDocuments = (
@@ -21,6 +24,7 @@ export const indexDocuments = (
   config: Config,
   documents: readonly Document[],
   now: string = today(),
+  verified: ReadonlyMap<string, Verification> = new Map(),
 ): StoreIndex => ({
   root,
   config,
@@ -29,6 +33,7 @@ export const indexDocuments = (
   items: documents.flatMap((doc) => doc.ledger?.items ?? []),
   byName: new Map(documents.map((doc) => [doc.name, doc])),
   byRel: new Map(documents.map((doc) => [doc.rel, doc])),
+  verified,
 });
 
 export const buildIndex = async (
@@ -43,5 +48,5 @@ export const buildIndex = async (
       return parseDocument({ path, rel, text: await Bun.file(path).text() }, config);
     }),
   );
-  return indexDocuments(root, config, documents, now);
+  return indexDocuments(root, config, documents, now, await readVerifications(root));
 };

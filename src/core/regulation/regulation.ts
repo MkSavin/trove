@@ -155,6 +155,8 @@ const lifecycle = (config: Config): string => {
 ${table(["type", "when", "belongs in"], steps)}
 
 Work documents not re-checked for ${config.freshness.default} days (unless the type sets its own limit) are reported as stale, with their \`verify\` hint.
+
+A \`verify-cmd\` header field makes the re-check repeatable: a shell command, with \`{root:<name>}\` and \`{store}\` for absolute paths, that exits 0 while what the document describes still holds. \`trove check --verify\` runs those of the documents in work.
 `;
 };
 

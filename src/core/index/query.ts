@@ -1,6 +1,7 @@
 import type { Document } from "../document/document.ts";
 import { staleDays } from "../document/freshness.ts";
 import type { Item } from "../document/ledger.ts";
+import { lastVerified } from "../verify/last.ts";
 import type { StoreIndex } from "./index.ts";
 import { fieldMatches } from "./match.ts";
 
@@ -28,6 +29,8 @@ export const documentField = (
       return doc.folder;
     case "stale":
       return String(staleDays(doc, index.config, index.today) !== undefined);
+    case "verified":
+      return lastVerified(doc, index.verified);
     default:
       return doc.meta[field];
   }
