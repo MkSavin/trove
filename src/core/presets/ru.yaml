@@ -102,6 +102,7 @@ ledger:
     - { key: what, label: что осталось, required: true }
     - { key: blocked_by, label: ждёт }
     - { key: until, label: до }
+    - { key: checked, label: сверено }
   open: [open]
   closed: { fixed: исправлено, dropped: снято, moved: перенесено }
   note: "{status} {date}, {commit}"

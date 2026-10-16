@@ -80,6 +80,7 @@ ledger:
     - { key: what, label: what is left, required: true }
     - { key: blocked_by, label: waits for }
     - { key: until, label: until }
+    - { key: checked, label: checked }
   closed: { fixed: fixed, dropped: dropped, moved: moved }
   note: "{status} {date}, {commit}"
 
