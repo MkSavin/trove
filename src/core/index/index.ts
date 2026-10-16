@@ -2,6 +2,7 @@ import { join } from "node:path";
 import type { Config } from "../config/schema.ts";
 import { type Document, parseDocument } from "../document/document.ts";
 import type { Item } from "../document/ledger.ts";
+import type { GitData } from "../live/git-data.ts";
 import { listDocuments } from "../store/walk.ts";
 import { today } from "../text/dates.ts";
 
@@ -14,6 +15,8 @@ export type StoreIndex = {
   items: readonly Item[];
   byName: ReadonlyMap<string, Document>;
   byRel: ReadonlyMap<string, Document>;
+  /** Read by `withStoreGitData`; blocks that need it are left as they are without it. */
+  gitData?: GitData | undefined;
 };
 
 export const indexDocuments = (

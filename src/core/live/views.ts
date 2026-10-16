@@ -2,10 +2,13 @@ import { posix } from "node:path";
 import { TroveError } from "../errors.ts";
 import { mergeFilters } from "../index/filters.ts";
 import type { StoreIndex } from "../index/index.ts";
-import { type Filters, selectDocuments, selectItems } from "../index/query.ts";
+import { type Filters, itemMatches, selectDocuments, selectItems } from "../index/query.ts";
 import { placementTable } from "../regulation/regulation.ts";
 import { cellText, columnLabel, groupTitle, type ReportRow } from "../reports/cells.ts";
 import { groupRows, renderCounts, sortRows, tableLines } from "../reports/section.ts";
+import { branchesKey, branchesRoot, renderBranches } from "./branches.ts";
+import { changeRows, changesKey } from "./changes.ts";
+import { loaded } from "./git-data.ts";
 
 /** Where a block lives and what it inherits: links are relative to it, filters add up. */
 export type ViewContext = { index: StoreIndex; rel: string; base: Filters };
@@ -14,14 +17,23 @@ const LAYOUT_KEYS = new Set(["as", "columns", "group", "sort", "by", "label", "f
 const EMPTY = "—";
 const PLACEHOLDER = /\{(\w+)\}/g;
 
+type Layout = {
+  columns: string;
+  sort: string;
+  format: string;
+  /** Labels of columns that are not ledger columns. */
+  labels?: Readonly<Record<string, string>>;
+};
+
 const DEFAULTS = {
   items: { columns: "id,priority,what", sort: "priority,id", format: "{id} — {what}" },
+  changes: { columns: "change,id,what,document", sort: "", format: "{id} — {what} ({change})" },
   documents: {
     columns: "document,status,verify",
     sort: "type,path",
     format: "{document} — {status}",
   },
-} as const;
+} as const satisfies Record<string, Layout>;
 
 const list = (value: string): string[] => value.split(",").filter(Boolean);
 
@@ -50,14 +62,16 @@ const formatRow = (row: ReportRow, format: string, context: ViewContext, dir: st
 const layout = (
   rows: readonly ReportRow[],
   args: Readonly<Record<string, string>>,
-  defaults: (typeof DEFAULTS)[keyof typeof DEFAULTS],
+  defaults: Layout,
   context: ViewContext,
 ): string[] => {
   const dir = posix.dirname(context.rel);
   if (rows.length === 0) return [EMPTY];
   switch (args.as ?? "table") {
     case "table": {
-      const columns = list(args.columns ?? defaults.columns).map(labelledColumn);
+      const columns = list(args.columns ?? defaults.columns)
+        .map(labelledColumn)
+        .map((c) => ({ ...c, label: c.label ?? defaults.labels?.[c.key] }));
       return tableLines(
         columns.map((c) => columnLabel(c, context.index)),
         rows.map((row) => columns.map((c) => cellText(row, c, context.index, dir))),
@@ -75,7 +89,7 @@ const layout = (
 const grouped = (
   rows: ReportRow[],
   args: Readonly<Record<string, string>>,
-  defaults: (typeof DEFAULTS)[keyof typeof DEFAULTS],
+  defaults: Layout,
   context: ViewContext,
 ): string[] => {
   const sorted = sortRows(rows, list(args.sort ?? defaults.sort), context.index);
@@ -91,9 +105,29 @@ const grouped = (
   );
 };
 
-const VIEWS: Readonly<
-  Record<string, (args: Readonly<Record<string, string>>, context: ViewContext) => string[]>
-> = {
+/** Lines of a block; nothing when the git data it needs was not read. */
+type View = (args: Readonly<Record<string, string>>, context: ViewContext) => string[] | undefined;
+
+const changes: View = (args, context) => {
+  const baseline = loaded(context.index.gitData?.changes.get(changesKey(context.rel, args)));
+  if (!baseline) return undefined;
+  const before = baseline.value.before;
+  if (!before) return [EMPTY];
+  const { since: _, ...rest } = args;
+  const rows = changeRows(context.index, before, posix.dirname(context.rel)).filter(
+    itemMatches(context.index, filtersOf(rest, context.base)),
+  );
+  const labels = { change: context.index.config.labels.change };
+  return grouped(rows, rest, { ...DEFAULTS.changes, labels }, context);
+};
+
+const branches: View = (args, context) => {
+  branchesRoot(context.index.config, args);
+  const table = loaded(context.index.gitData?.branches.get(branchesKey(args)));
+  return table && renderBranches(table.value, context.index.config);
+};
+
+const VIEWS: Readonly<Record<string, View>> = {
   items: (args, context) =>
     grouped(
       selectItems(context.index, filtersOf(args, context.base)),
@@ -118,6 +152,8 @@ const VIEWS: Readonly<
       { label: args.label, outputDir: posix.dirname(context.rel) },
     ),
   placement: (_, context) => [placementTable(context.index.config)],
+  branches,
+  changes,
 };
 
 export const VIEW_NAMES = Object.keys(VIEWS);
@@ -126,8 +162,8 @@ export const renderView = (
   view: string,
   args: Readonly<Record<string, string>>,
   context: ViewContext,
-): string => {
+): string | undefined => {
   const render = VIEWS[view];
   if (!render) throw new TroveError(`unknown block trove:${view}; one of ${VIEW_NAMES.join(", ")}`);
-  return render(args, context).join("\n");
+  return render(args, context)?.join("\n");
 };

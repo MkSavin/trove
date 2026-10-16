@@ -17,6 +17,10 @@ export const isDocument = (row: ReportRow): row is Document => "rel" in row;
 const linkTo = (rel: string, outputDir: string): string =>
   `[${basename(rel, ".md")}](${posix.relative(outputDir, rel)})`;
 
+/** A link while the document exists; an item that left the store keeps only its old name. */
+export const documentCell = (rel: string, index: StoreIndex, outputDir: string): string =>
+  index.byRel.has(rel) ? linkTo(rel, outputDir) : basename(rel, ".md");
+
 /** Groups of documents read as links to them; other groups as their value. */
 export const groupTitle = (name: string, key: string, outputDir: string): string =>
   key === DOCUMENT_COLUMN && name ? linkTo(name, outputDir) : name;
@@ -38,7 +42,8 @@ const cellValue = (
   index: StoreIndex,
   outputDir: string,
 ): string | undefined => {
-  if (key === DOCUMENT_COLUMN) return linkTo(isDocument(row) ? row.rel : row.document, outputDir);
+  if (key === DOCUMENT_COLUMN)
+    return documentCell(isDocument(row) ? row.rel : row.document, index, outputDir);
   if (key === DRIFT && !isDocument(row)) return driftedFiles(index, row)?.join(", ");
   return rowField(row, key, index);
 };

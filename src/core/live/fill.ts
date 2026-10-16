@@ -14,7 +14,7 @@ const baseFilters = (text: string) =>
 
 /**
  * Rebuilds every closed `trove:` block of a text from the index; blocks that cannot be built stay
- * as they are and are returned as problems.
+ * as they are and are returned as problems. Blocks whose git data was not read just stay.
  */
 export const fillLiveBlocks = (
   text: string,
@@ -31,7 +31,8 @@ export const fillLiveBlocks = (
       return current;
     }
     try {
-      const body = renderView(block.view, block.args, { index, rel, base }).replaceAll("\n", eol);
+      const body = renderView(block.view, block.args, { index, rel, base })?.replaceAll("\n", eol);
+      if (body === undefined) return current;
       return `${current.slice(0, block.open.end)}${eol}${body}${eol}${current.slice(block.close.start)}`;
     } catch (error) {
       problems.push({ block, message: (error as Error).message });

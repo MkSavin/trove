@@ -3,6 +3,7 @@ import { CONFIG_FILE, loadConfig } from "../config/load.ts";
 import type { Config } from "../config/schema.ts";
 import { TroveError } from "../errors.ts";
 import { buildIndex, type StoreIndex } from "../index/index.ts";
+import { withStoreGitData } from "../live/git-data.ts";
 import { builtinRules } from "../rules/builtin/index.ts";
 import { loadPluginRules, mergeRules } from "../rules/plugins.ts";
 import type { Rule } from "../rules/rule.ts";
@@ -40,6 +41,6 @@ export const openStore = async (options: OpenOptions): Promise<Store> => {
     : join(root, CONFIG_FILE);
   const config = await loadConfig(configPath);
   const rules = mergeRules(builtinRules, await loadPluginRules(root, config.plugins));
-  const index = await buildIndex(root, config, options.today);
+  const index = await withStoreGitData(await buildIndex(root, config, options.today));
   return { root, configPath, config, rules, index };
 };

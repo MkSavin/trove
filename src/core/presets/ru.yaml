@@ -31,6 +31,12 @@ labels:
   summaryCounts: По приоритетам
   summaryItems: Открытые пункты
   summaryDocuments: Документы в работе
+  branch: ветка
+  lastCommit: последний коммит
+  change: изменение
+  changeClosed: закрыт
+  changeAdded: добавлен
+  changeMoved: перенесён
 
 fields:
   type: required

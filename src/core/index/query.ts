@@ -73,12 +73,16 @@ export const selectDocuments = (index: StoreIndex, filters: Filters): Document[]
     ),
   );
 
+/** Whether an item passes the filters, closed or not. */
+export const itemMatches =
+  (index: StoreIndex, filters: Filters) =>
+  (item: Item): boolean =>
+    Object.entries(filters).every(([field, wanted]) =>
+      fieldMatches(itemField(item, field, index), itemVocabulary(item, field, index), wanted),
+    );
+
 /** Closed items are left out unless the filter names `state`. */
 export const selectItems = (index: StoreIndex, filters: Filters): Item[] =>
   index.items.filter(
-    (item) =>
-      (!item.closed || Object.hasOwn(filters, STATE)) &&
-      Object.entries(filters).every(([field, wanted]) =>
-        fieldMatches(itemField(item, field, index), itemVocabulary(item, field, index), wanted),
-      ),
+    (item) => (!item.closed || Object.hasOwn(filters, STATE)) && itemMatches(index, filters)(item),
   );
