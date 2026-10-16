@@ -11,7 +11,7 @@ export type Found = {
   path: string;
   /** Set when that commit is on a remote branch of a web-hosted `origin`. */
   web: WebRepo | undefined;
-  /** A branch that has the commit, when the file is not in the root's own history. */
+  /** A branch, else a tag, that has the commit, when the file is not in the root's own history. */
   branch: string | undefined;
 };
 
@@ -58,6 +58,7 @@ const branchOf = async (dir: string, commit: string): Promise<string | undefined
       `--contains=${commit}`,
       "refs/heads",
       "refs/remotes",
+      "refs/tags",
     ])
   )?.split("\n")[0];
 
