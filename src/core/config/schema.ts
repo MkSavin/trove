@@ -245,6 +245,10 @@ export const configSchema = z.strictObject({
       changeClosed: z.string().default("closed"),
       changeAdded: z.string().default("added"),
       changeMoved: z.string().default("moved"),
+      week: z.string().default("week"),
+      trendOpened: z.string().default("opened"),
+      trendClosed: z.string().default("closed"),
+      trendOpen: z.string().default("open at end"),
     })
     .default({
       statusLine: "Status",
@@ -264,6 +268,10 @@ export const configSchema = z.strictObject({
       changeClosed: "closed",
       changeAdded: "added",
       changeMoved: "moved",
+      week: "week",
+      trendOpened: "opened",
+      trendClosed: "closed",
+      trendOpen: "open at end",
     }),
   fields,
   types: z.record(z.string(), documentType),

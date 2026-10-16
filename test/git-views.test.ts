@@ -36,8 +36,7 @@ const block = (open: string) =>
 const fill = async (index: StoreIndex, text: string, rel = "NOTES.md") =>
   fillLiveBlocks(text, rel, await withGitData(index, [{ rel, text }]));
 
-const copySandbox = async (roots: string): Promise<string> => {
-  const root = join(workspace, "store");
+const copySandbox = async (roots: string, root = join(workspace, "store")): Promise<string> => {
   await cp(join(ROOT, "sandbox"), root, { recursive: true });
   const config = Bun.file(join(root, "trove.yaml"));
   await Bun.write(config, (await config.text()).replace("harbor: ../harbor", roots));
@@ -129,6 +128,22 @@ describe("branches", () => {
     expect(any.text).toContain("| origin/feature/old |");
     const wrong = await fill(store.index, block("<!-- trove:branches root=app merged=no -->"));
     expect(wrong.problems[0]?.message).toBe("merged=no: use false, true or any");
+  });
+
+  test("active= hides branches whose last commit is older than the span", async () => {
+    const names = async (active: string) => {
+      const { text, problems } = await fill(
+        store.index,
+        block(`<!-- trove:branches root=app pattern=feature/* active=${active} -->`),
+      );
+      expect(problems).toEqual([]);
+      return [...text.matchAll(/^\| (\S+)/gm)].map((match) => match[1]).slice(2);
+    };
+    expect(await names("3w")).toEqual(["origin/feature/b", "feature/e"]);
+    expect(await names("22d")).toEqual(["origin/feature/b", "feature/e", "origin/feature/d"]);
+    expect(await names("2m")).toContain("origin/feature/old");
+    const wrong = await fill(store.index, block("<!-- trove:branches root=app active=soon -->"));
+    expect(wrong.problems[0]?.message).toMatch(/^active=soon: give days, weeks or months/);
   });
 
   test("an unknown root or base is a block problem", async () => {
@@ -282,6 +297,15 @@ describe("changes", () => {
     expect(later.text).toContain("<!-- trove:changes -->\n—\n");
   });
 
+  test("a summary replacing one of the same day starts from that one", async () => {
+    const store = await open();
+    const plan = await newSummary(store.index, { kind: "web", name: "WEB_2026-10-20_DRY" });
+    expect(plan.changes.map((change) => change.rel)).toContain(
+      ".archive/summaries/SUMMARY_WEB_2026-10-20.md",
+    );
+    expect(plan.changes[0]?.text).toContain("columns=change,id,document,from -->\n—\n<!--");
+  });
+
   test("since a date or a commit, filtered and laid out like items", async () => {
     const store = await open();
     const byDate = await fill(
@@ -306,6 +330,38 @@ describe("changes", () => {
     expect(first.text).toContain("<!-- trove:changes -->\n—\n");
   });
 
+  test("since a date follows the main line, not an older commit of a merged branch", async () => {
+    const repo = join(workspace, "merged");
+    await mkdir(repo);
+    await git(repo, ["init", "--quiet", "--initial-branch=main"]);
+    await Bun.write(join(repo, "code.txt"), "code\n");
+    await git(repo, ["add", "--all"]);
+    await commitOn(repo, "code", "2026-10-01");
+    await git(repo, ["branch", "feature"]);
+    const docs = await copySandbox("harbor: ../harbor", join(repo, "docs"));
+    await git(repo, ["add", "--all"]);
+    await commitOn(repo, "docs: base", "2026-10-10");
+    const docsBase = (await git(repo, ["rev-parse", "HEAD"])).out;
+    await git(repo, ["switch", "--quiet", "feature"]);
+    await Bun.write(join(repo, "feature.txt"), "feature\n");
+    await git(repo, ["add", "--all"]);
+    await commitOn(repo, "feature", "2026-10-14");
+    await git(repo, ["switch", "--quiet", "main"]);
+    await git(repo, ["merge", "--quiet", "--no-ff", "--no-edit", "feature"], {
+      env: { GIT_AUTHOR_DATE: "2026-10-16T12:00:00Z", GIT_COMMITTER_DATE: "2026-10-16T12:00:00Z" },
+    });
+    const before = await openStore({ cwd: docs, store: docs, today: "2026-10-17" });
+    await applyPlan(before, await closeItem(before.index, "API2-1"));
+    const store = await openStore({ cwd: docs, store: docs, today: "2026-10-17" });
+    const ids = (since: string) =>
+      fill(store.index, block(`<!-- trove:changes since=${since} group=change as=ids -->`));
+    const byDate = await ids("2026-10-15");
+    expect(byDate.text).toContain("**closed**\n\nAPI2-1\n");
+    expect(byDate.text.replace("2026-10-15", "")).toBe(
+      (await ids(docsBase)).text.replace(docsBase, ""),
+    );
+  });
+
   test("an unknown starting point or a summary without a kind is a block problem", async () => {
     const store = await open();
     const unknown = await fill(store.index, block("<!-- trove:changes since=nope -->"));
@@ -314,5 +370,71 @@ describe("changes", () => {
     );
     const kindless = await fill(store.index, block("<!-- trove:changes -->"));
     expect(kindless.problems[0]?.message).toMatch(/needs a summary with a kind/);
+  });
+});
+
+describe("trend", () => {
+  let store: Store;
+
+  const commitAll = async (repo: string, message: string, date: string) => {
+    await git(repo, ["add", "--all"]);
+    await commitOn(repo, message, date);
+  };
+
+  beforeAll(async () => {
+    const root = await copySandbox("harbor: ../harbor", join(workspace, "trend"));
+    const on = (today: string) => openStore({ cwd: root, store: root, today });
+    await git(root, ["init", "--quiet", "--initial-branch=main"]);
+    await commitAll(root, "docs: base", "2026-10-02");
+    const closing = await on("2026-10-07");
+    await applyPlan(closing, await closeItem(closing.index, "API2-1"));
+    await commitAll(root, "docs: close API2-1", "2026-10-07");
+    const adding = await on("2026-10-13");
+    await applyPlan(
+      adding,
+      addItem(adding.index, {
+        document: "AUDIT_API_2",
+        values: { priority: "P2", owner: "api", what: "Rate limits are per process" },
+      }),
+    );
+    await commitAll(root, "docs: add API2-5", "2026-10-13");
+    const uncommitted = await on("2026-10-21");
+    await applyPlan(uncommitted, await closeItem(uncommitted.index, "MOB1-1"));
+    store = await on("2026-10-21");
+  });
+
+  test("items opened and closed each week and open at its end, from the ledgers' history", async () => {
+    const { text, problems } = await fill(store.index, block("<!-- trove:trend weeks=3 -->"));
+    expect(problems).toEqual([]);
+    expect(text).toContain(
+      [
+        "| week | opened | closed | open at end |",
+        "| ---- | ------ | ------ | ----------- |",
+        "| 2026-10-05 | 0 | 1 | 17 |",
+        "| 2026-10-12 | 1 | 0 | 18 |",
+        "| 2026-10-19 | 0 | 1 | 17 |",
+        "<!-- /trove:trend -->",
+      ].join("\n"),
+    );
+  });
+
+  test("by a field, filtered like items, with a row per week and value", async () => {
+    const { text } = await fill(
+      store.index,
+      block("<!-- trove:trend weeks=2 owner=api by=priority label=P -->"),
+    );
+    expect(text).toContain(
+      [
+        "| week | P | opened | closed | open at end |",
+        "| ---- | - | ------ | ------ | ----------- |",
+        "| 2026-10-12 | P1 | 0 | 0 | 1 |",
+        "| 2026-10-12 | P2 | 1 | 0 | 2 |",
+        "| 2026-10-19 | P1 | 0 | 0 | 1 |",
+        "| 2026-10-19 | P2 | 0 | 0 | 2 |",
+        "<!-- /trove:trend -->",
+      ].join("\n"),
+    );
+    const wrong = await fill(store.index, block("<!-- trove:trend weeks=x -->"));
+    expect(wrong.problems[0]?.message).toBe("weeks=x: give a number of weeks from 1 to 104");
   });
 });

@@ -6,6 +6,7 @@ import { git } from "../git/git.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { tableLines } from "../reports/section.ts";
 import { compareText } from "../text/compare.ts";
+import { activeFrom } from "./active.ts";
 import { branchRefs, type LocalLead } from "./branch-refs.ts";
 
 type Args = Readonly<Record<string, string>>;
@@ -23,7 +24,7 @@ export type BranchRow = {
 
 export type BranchTable = { bases: readonly string[]; rows: readonly BranchRow[] };
 
-const OPTIONS = new Set(["root", "pattern", "against", "merged"]);
+const OPTIONS = new Set(["root", "pattern", "against", "merged", "active"]);
 const MERGED = ["false", "true", "any"];
 
 const list = (value: string | undefined): string[] => (value ?? "").split(",").filter(Boolean);
@@ -36,7 +37,7 @@ export const branchesRoot = (config: Config, args: Args): { name: string; path: 
   const unknown = Object.keys(args).filter((key) => !OPTIONS.has(key));
   if (unknown.length > 0)
     throw new TroveError(
-      `trove:branches takes root, pattern, against and merged, not ${unknown.join(", ")}`,
+      `trove:branches takes root, pattern, against, merged and active, not ${unknown.join(", ")}`,
     );
   const names = Object.keys(config.roots);
   const name = args.root ?? (names.length === 1 ? names[0] : undefined);
@@ -91,11 +92,18 @@ const escaped = (text: string): string => text.replaceAll("|", "\\|");
 const isMerged = (table: BranchTable, row: BranchRow): boolean =>
   table.bases.length > 0 && row.ahead.every((count) => count === 0);
 
-/** `merged=false`, the default, hides branches merged into every base; `true` shows only those. */
-const shown = (table: BranchTable, merged: string): BranchRow[] => {
+export type BranchFilter = { merged?: string | undefined; active?: string | undefined };
+
+/**
+ * `merged=false`, the default, hides branches merged into every base; `true` shows only those.
+ * `active=30d` hides branches whose last commit is older.
+ */
+const shown = (table: BranchTable, filter: BranchFilter, today: string): BranchRow[] => {
+  const merged = filter.merged ?? "false";
   if (!MERGED.includes(merged)) throw new TroveError(`merged=${merged}: use false, true or any`);
+  const from = filter.active === undefined ? "" : activeFrom(filter.active, today);
   return table.rows.filter(
-    (row) => merged === "any" || isMerged(table, row) === (merged === "true"),
+    (row) => (merged === "any" || isMerged(table, row) === (merged === "true")) && row.date >= from,
   );
 };
 
@@ -108,8 +116,13 @@ const nameCell = (row: BranchRow, config: Config): string => {
   return `${row.name} (${note})`;
 };
 
-export const renderBranches = (table: BranchTable, config: Config, merged = "false"): string[] => {
-  const rows = shown(table, merged);
+export const renderBranches = (
+  table: BranchTable,
+  config: Config,
+  filter: BranchFilter,
+  today: string,
+): string[] => {
+  const rows = shown(table, filter, today);
   const own = table.bases.length > 0 ? [config.labels.ownCommits] : [];
   return rows.length === 0
     ? ["—"]

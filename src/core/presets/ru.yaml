@@ -40,6 +40,10 @@ labels:
   changeClosed: закрыт
   changeAdded: добавлен
   changeMoved: перенесён
+  week: неделя
+  trendOpened: открыто
+  trendClosed: закрыто
+  trendOpen: открыто на конец
 
 fields:
   type: required

@@ -6,6 +6,7 @@ import { queryRows } from "../src/core/index/rows.ts";
 import { refreshPlan } from "../src/core/ops/refresh.ts";
 import { carryWritten } from "../src/core/summaries/carry.ts";
 import { newSummary, showSummary } from "../src/core/summaries/summaries.ts";
+import { emptyWritePlaces } from "../src/core/summaries/write-places.ts";
 import { openStore, parseConfig } from "../src/index.ts";
 import { ROOT, TODAY } from "./helpers.ts";
 
@@ -188,11 +189,61 @@ describe("carrying a summary over", () => {
       "Gone from the template.",
     ].join("\n");
     const carried = carryWritten(template, previous);
-    expect(carried).toStartWith("The intro as written.\n\n## Counts");
-    expect(carried).toContain("<!-- /trove:counts -->\n\nLook at API2-1 first.\n\n## New section");
+    expect(carried).toStartWith("<!-- write: intro -->\nThe intro as written.\n\n## Counts");
+    expect(carried).toContain(
+      "<!-- /trove:counts -->\n\n<!-- write: what to look at first -->\nLook at API2-1 first.\n\n## New section",
+    );
     expect(carried).toContain("<!-- trove:items status=deferred -->");
     expect(carried).toEndWith("<!-- write: not verified yet -->");
     expect(carried).not.toContain("Gone from the template.");
     expect(carried).not.toContain("| P | count |");
+  });
+
+  test("a place is found by its label first, even when a new block now sits above it", () => {
+    const template = [
+      "## Notes",
+      "",
+      "<!-- trove:changes -->",
+      "<!-- /trove:changes -->",
+      "",
+      "<!-- write: what changed -->",
+      "",
+      "## Risks",
+      "",
+      "<!-- trove:items -->",
+      "<!-- /trove:items -->",
+      "",
+      "<!-- write: the risks -->",
+    ].join("\n");
+    const labelled = [
+      "## Notes",
+      "",
+      "<!-- write: what changed -->",
+      "Two items closed.",
+      "",
+      "## Risks",
+      "",
+      "<!-- write: the risks -->",
+      "Backups untested.",
+    ].join("\n");
+    const carried = carryWritten(template, labelled);
+    expect(carried).toContain("<!-- write: what changed -->\nTwo items closed.\n\n## Risks");
+    expect(carried).toEndWith("<!-- write: the risks -->\nBackups untested.");
+    const unlabelled = ["## Notes", "", "Two items closed.", "", "## New", "", "Kept."].join("\n");
+    const fallback = carryWritten(template, unlabelled);
+    expect(fallback).toContain("<!-- write: what changed -->\nTwo items closed.\n\n## Risks");
+    expect(fallback).toEndWith("<!-- write: the risks -->");
+  });
+
+  test("a place counts as written once text sits under its label", () => {
+    const lines = [
+      "<!-- write: intro -->",
+      "Written.",
+      "<!-- write: next -->",
+      "",
+      "## Heading",
+      "<!-- write: last -->",
+    ];
+    expect(emptyWritePlaces(lines)).toEqual([2, 5]);
   });
 });

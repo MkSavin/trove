@@ -10,6 +10,7 @@ import { branchesKey, branchesRoot, renderBranches } from "./branches.ts";
 import { renderChangeCounts } from "./change-counts.ts";
 import { changeLabels, changeRows, changesKey } from "./changes.ts";
 import { loaded } from "./git-data.ts";
+import { renderTrend, trendKey } from "./trend.ts";
 
 /** Where a block lives and what it inherits: links are relative to it, filters add up. */
 export type ViewContext = { index: StoreIndex; rel: string; base: Filters };
@@ -147,7 +148,27 @@ const changes: View = (args, context) => {
 const branches: View = (args, context) => {
   branchesRoot(context.index.config, args);
   const table = loaded(context.index.gitData?.branches.get(branchesKey(args)));
-  return table && renderBranches(table.value, context.index.config, args.merged);
+  return (
+    table &&
+    renderBranches(
+      table.value,
+      context.index.config,
+      { merged: args.merged, active: args.active },
+      context.index.today,
+    )
+  );
+};
+
+const trend: View = (args, context) => {
+  const history = loaded(context.index.gitData?.trend.get(trendKey(args)));
+  if (!history) return undefined;
+  const { weeks: _, ...rest } = args;
+  return renderTrend(history.value, context.index, {
+    by: rest.by,
+    label: rest.label,
+    matches: itemMatches(context.index, filtersOf(rest, context.base)),
+    outputDir: posix.dirname(context.rel),
+  });
 };
 
 const VIEWS: Readonly<Record<string, View>> = {
@@ -186,6 +207,7 @@ const VIEWS: Readonly<Record<string, View>> = {
   placement: (_, context) => [placementTable(context.index.config)],
   branches,
   changes,
+  trend,
 };
 
 export const VIEW_NAMES = Object.keys(VIEWS);

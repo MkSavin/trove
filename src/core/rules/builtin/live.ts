@@ -1,5 +1,6 @@
 import { fillLiveBlocks } from "../../live/fill.ts";
 import { isSnapshot } from "../../live/snapshot.ts";
+import { emptyWritePlaces } from "../../summaries/write-places.ts";
 import { defineRule } from "../rule.ts";
 
 export const liveBlock = defineRule({
@@ -27,8 +28,6 @@ export const liveBlockStale = defineRule({
       : [{ line: 1, message: "generated blocks are out of date: run trove refresh" }],
 });
 
-const WRITE_PLACE = /^\s*<!--\s*write:/;
-
 export const writePlace = defineRule({
   id: "write-place",
   level: "warn",
@@ -37,7 +36,8 @@ export const writePlace = defineRule({
   check: (doc) =>
     doc.place === "archive"
       ? []
-      : doc.lines
-          .filter((line) => WRITE_PLACE.test(line.text))
-          .map((line) => ({ line: line.number, message: "a place left to write is still empty" })),
+      : emptyWritePlaces(doc.lines.map((line) => line.text)).map((i) => ({
+          line: doc.lines[i]?.number ?? i + 1,
+          message: "a place left to write is still empty",
+        })),
 });

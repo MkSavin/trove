@@ -6,18 +6,20 @@ import { findLiveBlocks } from "./blocks.ts";
 import { type BranchTable, branchesKey, loadBranches } from "./branches.ts";
 import { type Baseline, changesKey, loadChanges } from "./changes.ts";
 import { isSnapshot } from "./snapshot.ts";
+import { loadTrend, type TrendHistory, trendKey } from "./trend.ts";
 
 export type Fact<T> = { value: T } | { problem: string };
 
-/** What blocks that read git need, read once before filling: by `branchesKey` and `changesKey`. */
+/** What blocks that read git need, read once before filling, by each view's key. */
 export type GitData = {
   branches: ReadonlyMap<string, Fact<BranchTable>>;
   changes: ReadonlyMap<string, Fact<Baseline>>;
+  trend: ReadonlyMap<string, Fact<TrendHistory>>;
 };
 
 export type BlockSource = { rel: string; text: string };
 
-const GIT_VIEW = /<!--\s*trove:(branches|changes)\b/;
+const GIT_VIEW = /<!--\s*trove:(branches|changes|trend)\b/;
 
 /** Nothing when the data is not there to show; a thrown problem when it could not be read. */
 export const loaded = <T>(fact: Fact<T> | undefined): { value: T } | undefined => {
@@ -53,6 +55,7 @@ export const loadGitData = async (
 ): Promise<GitData> => {
   const branches = new Map<string, Promise<Fact<BranchTable> | undefined>>();
   const changes = new Map<string, Promise<Fact<Baseline> | undefined>>();
+  const trend = new Map<string, Promise<Fact<TrendHistory> | undefined>>();
   for (const source of sources.filter((candidate) => GIT_VIEW.test(candidate.text))) {
     for (const { view, args, close } of findLiveBlocks(splitLines(source.text))) {
       if (!close) continue;
@@ -61,14 +64,21 @@ export const loadGitData = async (
       const key = changesKey(source.rel, args);
       if (view === "changes" && !changes.has(key))
         changes.set(key, settle(loadChanges(index, source, args)));
+      if (view === "trend" && !trend.has(trendKey(args)))
+        trend.set(trendKey(args), settle(loadTrend(index, args)));
     }
   }
-  return { branches: await settled(branches), changes: await settled(changes) };
+  return {
+    branches: await settled(branches),
+    changes: await settled(changes),
+    trend: await settled(trend),
+  };
 };
 
 const merge = (first: GitData | undefined, second: GitData): GitData => ({
   branches: new Map([...(first?.branches ?? []), ...second.branches]),
   changes: new Map([...(first?.changes ?? []), ...second.changes]),
+  trend: new Map([...(first?.trend ?? []), ...second.trend]),
 });
 
 /** The index with git data for these sources too, e.g. a summary not written yet. */

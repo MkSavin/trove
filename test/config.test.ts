@@ -33,6 +33,7 @@ describe("config", () => {
     expect(russian.labels.changeAdded).toBe("new");
     expect(russian.labels.changeClosed).toBe("закрыт");
     expect(russian.labels.ownCommits).toBe("свои");
+    expect(russian.labels.trendOpen).toBe("открыто на конец");
     expect(parseConfig(`${MINIMAL}language: ru`, "inline").labels.checked).toBe("Checked");
     expect(parseConfig(MINIMAL, "inline").labels.changeClosed).toBe("closed");
   });

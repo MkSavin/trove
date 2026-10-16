@@ -18,9 +18,18 @@ const PREVIOUS = "previous";
 
 const firstLine = (text: string): string | undefined => text.split("\n").find(Boolean);
 
-/** The last commit before the day begins. */
-const commitBefore = async (root: string, date: string): Promise<Start> => {
-  const found = await git(root, ["rev-list", "-1", `--before=${date}T00:00:00`, "HEAD"]);
+/**
+ * The last commit of the main line before the day begins. A merged branch's older commit lacks
+ * what the main line had then, so it never counts.
+ */
+export const commitBefore = async (root: string, date: string): Promise<Start> => {
+  const found = await git(root, [
+    "rev-list",
+    "-1",
+    "--first-parent",
+    `--before=${date}T00:00:00`,
+    "HEAD",
+  ]);
   return { commit: found.ok ? firstLine(found.out) : undefined };
 };
 
@@ -65,7 +74,7 @@ const previousSummary = (index: StoreIndex, source: BlockSource): Document | und
   const replaced = others.filter(
     (doc) =>
       supersedes.has(doc.rel) ||
-      splitRefs(doc.meta.superseded_by ?? "").some((ref) => names.has(ref)),
+      splitRefs(doc.meta.superseded_by ?? "").some((ref) => names.has(posix.basename(ref))),
   );
   return latest(replaced) ?? latest(others.filter((doc) => (doc.meta.date ?? "") < date));
 };

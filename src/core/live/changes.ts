@@ -1,14 +1,13 @@
-import { basename, join } from "node:path";
+import { basename } from "node:path";
 import type { Config } from "../config/schema.ts";
-import { parseDocument } from "../document/document.ts";
 import type { Item } from "../document/ledger.ts";
 import { TroveError } from "../errors.ts";
-import { git, gitOrThrow, toplevel } from "../git/git.ts";
+import { toplevel } from "../git/git.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { documentCell } from "../reports/cells.ts";
-import { documentPath } from "../store/walk.ts";
 import { compareNatural } from "../text/compare.ts";
 import type { BlockSource } from "./git-data.ts";
+import { itemsAt } from "./items-at.ts";
 import { movedOut } from "./moved-out.ts";
 import { startOf } from "./since.ts";
 
@@ -29,29 +28,6 @@ const LABEL = {
 
 export const changesKey = (rel: string, args: Args): string =>
   JSON.stringify([rel, args.since ?? "previous"]);
-
-const paths = async (root: string, args: readonly string[]): Promise<string[]> =>
-  (await gitOrThrow(root, args, { raw: true })).split("\0").filter(Boolean);
-
-/** Unchanged documents are taken from the index; only the ones edited since are read from git. */
-const itemsAt = async (index: StoreIndex, commit: string): Promise<Item[]> => {
-  const isDocument = documentPath(index.config);
-  const then = (await paths(index.root, ["ls-tree", "-r", "-z", "--name-only", commit])).filter(
-    isDocument,
-  );
-  const edited = new Set(
-    await paths(index.root, ["diff", "-z", "--name-only", "--no-renames", "--relative", commit]),
-  );
-  const documents = await Promise.all(
-    then.map(async (rel) => {
-      const current = index.byRel.get(rel);
-      if (current && !edited.has(rel)) return current;
-      const text = (await git(index.root, ["show", `${commit}:./${rel}`], { raw: true })).out;
-      return parseDocument({ path: join(index.root, rel), rel, text }, index.config);
-    }),
-  );
-  return documents.flatMap((doc) => doc.ledger?.items ?? []);
-};
 
 export const loadChanges = async (
   index: StoreIndex,
