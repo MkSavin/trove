@@ -1,7 +1,8 @@
 import { z } from "zod";
+import type { StoreCache } from "../core/store/cache.ts";
 import { openStore, type Store } from "../core/store/open.ts";
 
-export type Context = { cwd: string };
+export type Context = { cwd: string; cache?: StoreCache };
 
 export const storeField = z
   .string()
@@ -23,4 +24,4 @@ export const asFilters = (
 export const dryRunField = z.boolean().optional().describe("Return the diff without writing");
 
 export const openFor = (context: Context, store: string | undefined): Promise<Store> =>
-  openStore({ cwd: context.cwd, store });
+  openStore({ cwd: context.cwd, store, cache: context.cache });

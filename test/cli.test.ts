@@ -63,6 +63,27 @@ describe("trove", () => {
     expect(chosen.stdout().split("\n")[0]?.split(/\s+/)).toEqual(["id", "plan"]);
   });
 
+  test("query pages long lists and says how to read on", async () => {
+    const sandbox = ["--store", join(ROOT, "sandbox")];
+    const all = captureIo();
+    await run(["query", "items", "--brief", ...sandbox], all);
+    const [header, ...rows] = all.stdout().trim().split("\n");
+    expect(header?.split(/\s+/)).toEqual(["id", "what"]);
+    const total = rows.length - 1;
+    expect(rows.at(-1)).toBe(`${total} items`);
+
+    const page = captureIo();
+    await run(["query", "items", "--brief", "--limit", "2", "--offset", "1", ...sandbox], page);
+    const lines = page.stdout().trim().split("\n");
+    expect(lines.slice(1, 3)).toEqual(rows.slice(1, 3));
+    expect(lines.at(-1)).toBe(`showing 2-3 of ${total} items; pass --offset 3`);
+
+    const json = captureIo();
+    await run(["query", "items", "--limit", "1", "--json", ...sandbox], json);
+    expect(JSON.parse(json.stdout())).toBeArrayOfSize(1);
+    expect(json.stderr()).toBe(`showing 1 of ${total} items; pass --offset 1\n`);
+  });
+
   test("query and show answer from the index", async () => {
     const query = captureIo();
     await run(["query", "items", "owner=backend", "--fields", "id,what", ...STORE], query);

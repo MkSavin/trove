@@ -5,8 +5,9 @@ import { codeTarget, linesOption } from "../../core/index/code-target.ts";
 import { codeUsers } from "../../core/index/code-users.ts";
 import { excerpts, formatExcerpts } from "../../core/index/excerpt.ts";
 import type { StoreIndex } from "../../core/index/index.ts";
+import { pageOf, shownText } from "../../core/index/page.ts";
 import { findDocument } from "../../core/index/resolve.ts";
-import { KINDS, queryRows } from "../../core/index/rows.ts";
+import { BRIEF_FIELDS, KINDS, queryRows } from "../../core/index/rows.ts";
 import { regulation, TOPICS } from "../../core/regulation/regulation.ts";
 import { runRules } from "../../core/rules/run.ts";
 import { showSummary } from "../../core/summaries/summaries.ts";
@@ -14,7 +15,7 @@ import { asFilters, type Context, filtersField, openFor, storeField } from "../c
 import { guarded, json, text } from "../respond.ts";
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const;
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 100;
 const SEVERITY_ORDER = ["error", "warn", "info"] as const;
 const REFS = "refs";
 
@@ -37,21 +38,37 @@ export const registerReadTools = (server: McpServer, context: Context): void => 
           .array(z.string())
           .optional()
           .describe("Columns to return; by default the columns of the matched items' ledgers"),
-        limit: z.int().positive().optional(),
+        brief: z
+          .boolean()
+          .optional()
+          .describe("Only id and what for items, path and status for documents"),
+        limit: z
+          .int()
+          .positive()
+          .optional()
+          .describe(`Rows to return, ${DEFAULT_LIMIT} by default`),
+        offset: z.int().nonnegative().optional().describe("Rows to skip, to read the next page"),
         path: z.string().optional().describe("kind refs: the code file, folder or glob"),
         lines: z.string().optional().describe("kind refs: only references touching lines 'A-B'"),
         all: z.boolean().optional().describe("kind refs: closed items and archived documents too"),
       }),
       annotations: READ_ONLY,
     },
-    guarded(async ({ store, kind, filters, fields, limit, path, lines, all }) => {
+    guarded(async ({ store, kind, filters, fields, brief, limit, offset, path, lines, all }) => {
       const opened = await openFor(context, store);
       const { rows } =
         kind === REFS
           ? codeUsers(opened.index, refsTarget(opened.index, path, lines), all ?? false)
-          : queryRows(opened.index, kind, asFilters(filters), fields);
-      const cap = limit ?? DEFAULT_LIMIT;
-      return json({ total: rows.length, rows: rows.slice(0, cap), truncated: rows.length > cap });
+          : queryRows(
+              opened.index,
+              kind,
+              asFilters(filters),
+              fields ?? (brief ? BRIEF_FIELDS[kind] : undefined),
+            );
+      const page = pageOf(rows, { limit: limit ?? DEFAULT_LIMIT, offset });
+      const shown = shownText(page);
+      const next = page.next === undefined ? "" : `; pass offset=${page.next}`;
+      return json({ total: page.total, rows: page.rows, ...(shown ? { note: shown + next } : {}) });
     }),
   );
 

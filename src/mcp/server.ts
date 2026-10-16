@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import packageJson from "../../package.json" with { type: "json" };
+import { createStoreCache } from "../core/store/cache.ts";
 import type { Context } from "./context.ts";
 import { registerResources } from "./resources.ts";
 import { registerEditTools } from "./tools/edit.ts";
@@ -16,10 +17,11 @@ export const createServer = (context: Context): McpServer => {
     { name: "trove", version: packageJson.version },
     { instructions: INSTRUCTIONS },
   );
-  registerReadTools(server, context);
-  registerEditTools(server, context);
-  registerMaintenanceTools(server, context);
-  registerResources(server, context);
+  const shared: Context = { cache: createStoreCache(), ...context };
+  registerReadTools(server, shared);
+  registerEditTools(server, shared);
+  registerMaintenanceTools(server, shared);
+  registerResources(server, shared);
   return server;
 };
 

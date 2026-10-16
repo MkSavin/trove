@@ -159,7 +159,11 @@
         "change": "change",
         "changeClosed": "closed",
         "changeAdded": "added",
-        "changeMoved": "moved"
+        "changeMoved": "moved",
+        "week": "week",
+        "trendOpened": "opened",
+        "trendClosed": "closed",
+        "trendOpen": "open at end"
       },
       "type": "object",
       "properties": {
@@ -229,6 +233,22 @@
         },
         "changeMoved": {
           "default": "moved",
+          "type": "string"
+        },
+        "week": {
+          "default": "week",
+          "type": "string"
+        },
+        "trendOpened": {
+          "default": "opened",
+          "type": "string"
+        },
+        "trendClosed": {
+          "default": "closed",
+          "type": "string"
+        },
+        "trendOpen": {
+          "default": "open at end",
           "type": "string"
         }
       },

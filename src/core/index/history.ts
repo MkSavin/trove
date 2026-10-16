@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
+import { z } from "zod";
 import type { Item } from "../document/ledger.ts";
 import { gitSync } from "../git/git.ts";
 import { isIsoDate } from "../text/dates.ts";
 import { itemChecked } from "./checked.ts";
 import { itemCodeRefs } from "./code-refs.ts";
+import { type GitReads, openGitReads, readAtCommit } from "./git-reads.ts";
 import type { StoreIndex } from "./index.ts";
 import { type CodeRef, type CodeRoot, rootKey } from "./links.ts";
 
@@ -15,11 +17,10 @@ export type Watched = { item: Item; since: string; refs: readonly CodeRef[] };
 /** Missing when git cannot read the root, e.g. its ref or the checked commit is unknown here. */
 type Logs = ReadonlyMap<string, readonly Commit[] | undefined>;
 
-export type History = { items: ReadonlyMap<Item, Watched>; logs: Logs };
+export type History = { items: ReadonlyMap<Item, Watched>; logs: Logs; reads: GitReads };
 
 type LogRequest = { root: CodeRoot; paths: Set<string>; since: string };
 
-export const HEAD = "HEAD";
 /** Keeps each git command line well under the Windows limit. */
 const PATHS_PER_CALL = 100;
 
@@ -45,10 +46,12 @@ const watched = (index: StoreIndex): Watched[] =>
 const logKey = (root: CodeRoot, since: string): string =>
   isIsoDate(since) ? rootKey(root) : `${rootKey(root)}\0${since}`;
 
-const range = (root: CodeRoot, since: string): string[] =>
-  isIsoDate(since)
-    ? [`--since=${since}T00:00:00`, root.ref ?? HEAD]
-    : [`${since}..${root.ref ?? HEAD}`];
+const COMMITS = z.array(
+  z.object({ hash: z.string(), date: z.string(), files: z.array(z.string()) }),
+);
+
+const range = (commit: string, since: string): string[] =>
+  isIsoDate(since) ? [`--since=${since}T00:00:00`, commit] : [`${since}..${commit}`];
 
 /** Each commit prints as `\0<hash> <date>` followed by the files it changed, relative to the root. */
 const readLog = (out: string): Commit[] =>
@@ -58,9 +61,14 @@ const readLog = (out: string): Commit[] =>
     return hash ? [{ hash, date, files }] : [];
   });
 
-const logAt = ({ root, paths, since }: LogRequest): Commit[] | undefined => {
+const readCommits = (
+  root: CodeRoot,
+  commit: string,
+  paths: readonly string[],
+  since: string,
+): Commit[] | undefined => {
   const commits = new Map<string, Commit>();
-  for (const batch of chunks([...paths])) {
+  for (const batch of chunks(paths)) {
     const log = gitSync(root.dir, [
       "-c",
       "core.quotePath=false",
@@ -69,23 +77,27 @@ const logAt = ({ root, paths, since }: LogRequest): Commit[] | undefined => {
       "--format=%x00%H %cs",
       "--name-only",
       "--relative",
-      ...range(root, since),
+      ...range(commit, since),
       "--",
       ...batch,
     ]);
     if (!log.ok) return undefined;
-    for (const commit of readLog(log.out)) {
-      const known = commits.get(commit.hash);
-      commits.set(
-        commit.hash,
-        known ? { ...known, files: [...known.files, ...commit.files] } : commit,
-      );
+    for (const read of readLog(log.out)) {
+      const known = commits.get(read.hash);
+      commits.set(read.hash, known ? { ...known, files: [...known.files, ...read.files] } : read);
     }
   }
   return [...commits.values()];
 };
 
-const readLogs = (items: readonly Watched[]): Logs => {
+const logAt = (reads: GitReads, { root, paths, since }: LogRequest): Commit[] | undefined => {
+  const sorted = [...paths].sort();
+  return readAtCommit(reads, root, ["log", since, ...sorted], COMMITS, (commit) =>
+    readCommits(root, commit, sorted, since),
+  );
+};
+
+const readLogs = (reads: GitReads, items: readonly Watched[]): Logs => {
   const requests = new Map<string, LogRequest>();
   for (const { since, refs } of items) {
     for (const { root, path } of refs) {
@@ -97,7 +109,7 @@ const readLogs = (items: readonly Watched[]): Logs => {
       requests.set(key, request);
     }
   }
-  return new Map([...requests].map(([key, request]) => [key, logAt(request)]));
+  return new Map([...requests].map(([key, request]) => [key, logAt(reads, request)]));
 };
 
 const histories = new WeakMap<StoreIndex, History>();
@@ -107,10 +119,13 @@ export const codeHistory = (index: StoreIndex): History => {
   const known = histories.get(index);
   if (known) return known;
   const items = watched(index);
+  const reads = openGitReads(index);
   const history = {
     items: new Map(items.map((entry) => [entry.item, entry])),
-    logs: readLogs(items),
+    logs: readLogs(reads, items),
+    reads,
   };
+  reads.memo.save();
   histories.set(index, history);
   return history;
 };

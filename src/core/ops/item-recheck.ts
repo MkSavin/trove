@@ -9,7 +9,7 @@ import { CHECKED } from "../index/checked.ts";
 import { itemCodeRefs } from "../index/code-refs.ts";
 import { unchangedInContent } from "../index/content-drift.ts";
 import { mergeFilters } from "../index/filters.ts";
-import { HEAD } from "../index/history.ts";
+import { HEAD } from "../index/git-reads.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { type CodeRoot, rootKey } from "../index/links.ts";
 import { type Filters, selectItems } from "../index/query.ts";

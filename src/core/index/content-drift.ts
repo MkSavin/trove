@@ -25,11 +25,14 @@ export const unchangedInContent = (index: StoreIndex, item: Item): boolean => {
     if (commits.length > 0) touched.push(ref);
   }
   const roots = Map.groupBy(touched, (ref) => rootKey(ref.root));
-  return [...roots.values()].every((group) => {
+  const unchanged = [...roots.values()].every((group) => {
     const [first] = group;
     if (!first) return true;
     const paths = new Set(group.map((ref) => ref.path));
-    const hunks = hunksSince({ root: first.root, since, paths }, { ignoreSpace: true });
+    const check = { root: first.root, since, paths };
+    const hunks = hunksSince(history.reads, check, { ignoreSpace: true });
     return group.every((ref) => changedIn(hunks, ref) === false);
   });
+  history.reads.memo.save();
+  return unchanged;
 };

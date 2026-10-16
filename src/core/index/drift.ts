@@ -71,7 +71,10 @@ const findDrifts = (index: StoreIndex): ReadonlyMap<Item, Drift> => {
     since,
     refs: refs.map((ref) => ({ ref, state: fileState(history, since, ref) })),
   }));
-  const hunks = new Map([...lineChecks(assessed)].map(([key, check]) => [key, hunksSince(check)]));
+  const hunks = new Map(
+    [...lineChecks(assessed)].map(([key, check]) => [key, hunksSince(history.reads, check)]),
+  );
+  history.reads.memo.save();
   return new Map(
     assessed.map(({ item, since, refs }) => [
       item,
