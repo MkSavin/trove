@@ -43,6 +43,15 @@ export const positiveInteger = (flag: string, value: string | undefined): number
   return number;
 };
 
+export const nonNegativeInteger = (flag: string, value: string | undefined): number | undefined => {
+  if (value === undefined) return undefined;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 0) {
+    throw new TroveError(`--${flag} takes a whole number, zero or more: ${value}`);
+  }
+  return number;
+};
+
 /** `owner=web what="a, b"` → `{ owner: "web", what: "a, b" }`. */
 export const parsePairs = (pairs: readonly string[]): Record<string, string> =>
   Object.fromEntries(

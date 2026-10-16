@@ -60,6 +60,17 @@ const treeAt = (index: StoreIndex, dir: string, ref: string): ReadonlySet<string
   return cache.get(key);
 };
 
+const lookups = new WeakMap<StoreIndex, Map<string, boolean>>();
+
+/** Code links repeat the same few files and roots: each is looked up once per index. */
+const existsFor = (index: StoreIndex, path: string): boolean => {
+  const known = lookups.get(index) ?? new Map<string, boolean>();
+  lookups.set(index, known);
+  const found = known.get(path) ?? existsSync(path);
+  known.set(path, found);
+  return found;
+};
+
 /** Files git ignores, such as installed packages, are never in a commit: they are read from the checkout. */
 const ignoredInCheckout = (dir: string, absolute: string): boolean =>
   existsSync(absolute) && gitSync(dir, ["check-ignore", "-q", absolute]).ok;
@@ -77,9 +88,9 @@ const codeState = (
   absolute: string,
   pin: Pin | undefined,
 ): LinkState => {
-  if (!existsSync(root.dir)) return "unchecked";
+  if (!existsFor(index, root.dir)) return "unchecked";
   if (pin) return stateAt(index, root, absolute, pinnedRef(pin));
-  if (!root.ref) return existsSync(absolute) ? "ok" : "dead";
+  if (!root.ref) return existsFor(index, absolute) ? "ok" : "dead";
   return stateAt(index, root, absolute, root.ref);
 };
 

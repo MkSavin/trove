@@ -11,8 +11,13 @@ export const PRIVATE_POINTER = "trove.yaml";
 /** `shared` lives in the project tree, `private` in its `.git` folder. */
 export type PointerPlace = "shared" | "private";
 
+const STORE_NAME = /^[a-z\d][a-z\d-]*$/;
+
+/** Anything else passed as a store is a path. */
+export const isStoreName = (value: string): boolean => STORE_NAME.test(value);
+
 const entrySchema = z.strictObject({
-  name: z.string().regex(/^[a-z\d][a-z\d-]*$/, "lowercase letters, digits and dashes"),
+  name: z.string().regex(STORE_NAME, "lowercase letters, digits and dashes"),
   /** Relative to the project root, e.g. `../app-trove`. */
   path: z.string(),
   remote: z.string().optional(),

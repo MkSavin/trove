@@ -440,6 +440,28 @@ describe("drift", () => {
     expect(selectItems(reopened.index, { drift: ["true", "false"] })).toEqual([]);
   });
 
+  test("git reads are cached in the store's git folder by commit, a broken cache is ignored", async () => {
+    const store = await sandbox();
+    await driftedRepo(store);
+    await Bun.$`git init -q`.cwd(store.root).quiet();
+    const cache = join(store.root, ".git", "trove", "commit-cache.json");
+    const expected = [
+      { id: "WEB1-1", drift: "true" },
+      { id: "WEB1-2", drift: "false" },
+    ];
+    expect(driftOf(await reopen(store), ["WEB1-1", "WEB1-2"])).toEqual(expected);
+    expect(Object.keys((await Bun.file(cache).json()).entries).length).toBeGreaterThan(0);
+
+    await Bun.write(cache, "{ not json");
+    const main = join(ROOT, "src", "cli", "main.ts");
+    const out =
+      await Bun.$`bun ${main} query items id=WEB1-1,WEB1-2 --columns id,drift --json --store ${store.root}`
+        .quiet()
+        .json();
+    expect(out).toEqual(expected);
+    expect((await Bun.file(cache).json()).version).toBe(1);
+  });
+
   test("a root with a ref reads changes at that ref, not in the checkout", async () => {
     const store = await sandbox();
     await driftedRepo(store);

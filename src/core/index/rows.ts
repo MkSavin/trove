@@ -12,6 +12,11 @@ export type QueryResult = { fields: readonly string[]; rows: Row[] };
 
 const DOCUMENT_FIELDS = ["path", "type", "status", "checked"];
 
+export const BRIEF_FIELDS: Readonly<Record<Kind, readonly string[]>> = {
+  items: ["id", "what"],
+  documents: ["path", "status"],
+};
+
 export const isKind = (value: string | undefined): value is Kind =>
   KINDS.some((kind) => kind === value);
 

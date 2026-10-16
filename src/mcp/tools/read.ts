@@ -2,8 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { TroveError } from "../../core/errors.ts";
 import { excerpts, formatExcerpts } from "../../core/index/excerpt.ts";
+import { pageOf, shownText } from "../../core/index/page.ts";
 import { findDocument } from "../../core/index/resolve.ts";
-import { KINDS, queryRows } from "../../core/index/rows.ts";
+import { BRIEF_FIELDS, KINDS, queryRows } from "../../core/index/rows.ts";
 import { regulation, TOPICS } from "../../core/regulation/regulation.ts";
 import { runRules } from "../../core/rules/run.ts";
 import { showSummary } from "../../core/summaries/summaries.ts";
@@ -11,7 +12,7 @@ import { asFilters, type Context, filtersField, openFor, storeField } from "../c
 import { guarded, json, text } from "../respond.ts";
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const;
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 100;
 const SEVERITY_ORDER = ["error", "warn", "info"] as const;
 
 export const registerReadTools = (server: McpServer, context: Context): void => {
@@ -28,15 +29,27 @@ export const registerReadTools = (server: McpServer, context: Context): void => 
           .array(z.string())
           .optional()
           .describe("Columns to return; by default the columns of the matched items' ledgers"),
-        limit: z.int().positive().optional(),
+        brief: z
+          .boolean()
+          .optional()
+          .describe("Only id and what for items, path and status for documents"),
+        limit: z
+          .int()
+          .positive()
+          .optional()
+          .describe(`Rows to return, ${DEFAULT_LIMIT} by default`),
+        offset: z.int().nonnegative().optional().describe("Rows to skip, to read the next page"),
       }),
       annotations: READ_ONLY,
     },
-    guarded(async ({ store, kind, filters, fields, limit }) => {
+    guarded(async ({ store, kind, filters, fields, brief, limit, offset }) => {
       const opened = await openFor(context, store);
-      const { rows } = queryRows(opened.index, kind, asFilters(filters), fields);
-      const cap = limit ?? DEFAULT_LIMIT;
-      return json({ total: rows.length, rows: rows.slice(0, cap), truncated: rows.length > cap });
+      const columns = fields ?? (brief ? BRIEF_FIELDS[kind] : undefined);
+      const { rows } = queryRows(opened.index, kind, asFilters(filters), columns);
+      const page = pageOf(rows, { limit: limit ?? DEFAULT_LIMIT, offset });
+      const shown = shownText(page);
+      const next = page.next === undefined ? "" : `; pass offset=${page.next}`;
+      return json({ total: page.total, rows: page.rows, ...(shown ? { note: shown + next } : {}) });
     }),
   );
 

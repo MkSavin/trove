@@ -70,6 +70,37 @@ describe("mcp tools", () => {
     );
   });
 
+  test("query pages rows and notes how to read on", async () => {
+    const all = (await call("trove_query", { kind: "items", brief: true })).data();
+    expect(Object.keys(all.rows[0])).toEqual(["id", "what"]);
+    expect(all.note).toBeUndefined();
+
+    const page = (await call("trove_query", { kind: "items", limit: 2, offset: 2 })).data();
+    expect(page.rows.map((row: { id: string }) => row.id)).toEqual(
+      all.rows.slice(2, 4).map((row: { id: string }) => row.id),
+    );
+    expect(page).toMatchObject({
+      total: all.total,
+      note: `showing 3-4 of ${all.total}; pass offset=4`,
+    });
+
+    const last = (
+      await call("trove_query", { kind: "documents", brief: true, offset: 999 })
+    ).data();
+    expect(last.rows).toEqual([]);
+    expect(last.note).toStartWith("showing none of ");
+  });
+
+  test("a second call reuses the parsed store and sees edits made on disk", async () => {
+    const before = (await call("trove_query", { kind: "items", filters: { id: "API2-1" } })).data();
+    expect(before.rows[0].what).toStartWith("A refresh token");
+    const audit = join(root, "audits", "AUDIT_API_2.md");
+    const text = await Bun.file(audit).text();
+    await Bun.write(audit, text.replace("A refresh token stays", "A refresh token remains"));
+    const after = (await call("trove_query", { kind: "items", filters: { id: "API2-1" } })).data();
+    expect(after.rows[0].what).toStartWith("A refresh token remains");
+  });
+
   test("an item closes with a dry run first, then for real", async () => {
     const dry = (await call("trove_item", { action: "close", id: "WEB1-3", dryRun: true })).data();
     expect(dry.written).toBe(false);

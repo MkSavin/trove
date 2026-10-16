@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs";
+import { z } from "zod";
 import type { Item } from "../document/ledger.ts";
+import { type CommitMemo, commitCachePath, openCommitMemo } from "../git/commit-memo.ts";
 import { gitSync } from "../git/git.ts";
 import { type Hunk, parseHunks, touches, WHOLE_FILE } from "../git/hunks.ts";
 import { isIsoDate } from "../text/dates.ts";
@@ -23,6 +25,25 @@ type Changes = ReadonlyMap<string, string>;
 type Hunks = ReadonlyMap<string, readonly Hunk[]>;
 
 type LineCheck = { root: CodeRoot; since: string; paths: Set<string> };
+
+type Run = { commits: ReadonlyMap<string, string | undefined>; memo: CommitMemo };
+
+const CHANGES = z.array(z.tuple([z.string(), z.string()]));
+/** A `null` count is the whole file. */
+const HUNKS = z.array(z.tuple([z.string(), z.array(z.tuple([z.number(), z.number().nullable()]))]));
+
+type SavedHunks = z.infer<typeof HUNKS>;
+
+type SavedHunk = SavedHunks[number][1][number];
+
+const finite = (count: number): number | null => (Number.isFinite(count) ? count : null);
+
+const toSaved = ({ start, count }: Hunk): SavedHunk => [start, finite(count)];
+
+const toHunk = ([start, count]: SavedHunk): Hunk => ({
+  start,
+  count: count ?? WHOLE_FILE.count,
+});
 
 const HEAD = "HEAD";
 const UNKNOWN: Drift = { state: "unknown" };
@@ -54,15 +75,10 @@ const readLog = (out: string, into: Map<string, string>): void => {
   }
 };
 
-/** Missing when git cannot read the root, e.g. its ref is unknown here. */
-const changesAt = (
-  root: CodeRoot,
-  paths: readonly string[],
-  since: string,
-): Changes | undefined => {
+const readChanges = (dir: string, commit: string, paths: readonly string[], since: string) => {
   const changes = new Map<string, string>();
   for (const batch of chunks(paths, PATHS_PER_CALL)) {
-    const log = gitSync(root.dir, [
+    const log = gitSync(dir, [
       "-c",
       "core.quotePath=false",
       "--literal-pathspecs",
@@ -71,22 +87,38 @@ const changesAt = (
       "--format=%x00%cs",
       "--name-only",
       "--relative",
-      root.ref ?? HEAD,
+      commit,
       "--",
       ...batch,
     ]);
     if (!log.ok) return undefined;
     readLog(log.out, changes);
   }
-  return changes;
+  return [...changes];
+};
+
+/** Missing when git cannot read the root, e.g. its ref is unknown here. */
+const changesAt = (
+  run: Run,
+  root: CodeRoot,
+  paths: readonly string[],
+  since: string,
+): Changes | undefined => {
+  const commit = run.commits.get(rootKey(root));
+  if (!commit) return undefined;
+  const key = ["log", root.dir, commit, since, ...paths].join("\0");
+  const read = run.memo.read(key, CHANGES, () => readChanges(root.dir, commit, paths, since));
+  return read && new Map(read);
 };
 
 /** One git log per code root on this machine, from the earliest `checked` date pointing into it. */
-const changesByRoot = (items: readonly Watched[]): ReadonlyMap<string, Changes | undefined> => {
+const changesByRoot = (
+  run: Run,
+  items: readonly Watched[],
+): ReadonlyMap<string, Changes | undefined> => {
   const roots = new Map<string, { root: CodeRoot; paths: Set<string>; since: string }>();
   for (const { since, refs } of items) {
     for (const { root, path } of refs) {
-      if (!existsSync(root.dir)) continue;
       const key = rootKey(root);
       const entry = roots.get(key) ?? { root, paths: new Set<string>(), since };
       entry.paths.add(path);
@@ -95,7 +127,10 @@ const changesByRoot = (items: readonly Watched[]): ReadonlyMap<string, Changes |
     }
   }
   return new Map(
-    [...roots].map(([key, { root, paths, since }]) => [key, changesAt(root, [...paths], since)]),
+    [...roots].map(([key, { root, paths, since }]) => [
+      key,
+      changesAt(run, root, [...paths].sort(), since),
+    ]),
   );
 };
 
@@ -129,14 +164,18 @@ const lineChecks = (items: readonly Assessed[]): Map<string, LineCheck> => {
  * Line numbers were written against the code as of `checked`, so the diff runs from the last
  * commit on or before that day; its old-side hunks are in exactly those numbers.
  */
-const hunksSince = ({ root, since, paths }: LineCheck): Hunks | undefined => {
-  const ref = root.ref ?? HEAD;
-  const base = gitSync(root.dir, ["rev-list", "-1", `--before=${since}T23:59:59`, ref]);
+const readHunks = (
+  dir: string,
+  commit: string,
+  since: string,
+  paths: readonly string[],
+): SavedHunks | undefined => {
+  const base = gitSync(dir, ["rev-list", "-1", `--before=${since}T23:59:59`, commit]);
   if (!base.ok) return undefined;
-  if (!base.out) return new Map([...paths].map((path) => [path, [WHOLE_FILE]]));
-  const hunks = new Map<string, readonly Hunk[]>();
-  for (const batch of chunks([...paths], PATHS_PER_CALL)) {
-    const diff = gitSync(root.dir, [
+  if (!base.out) return paths.map((path): SavedHunks[number] => [path, [toSaved(WHOLE_FILE)]]);
+  const hunks: SavedHunks = [];
+  for (const batch of chunks(paths, PATHS_PER_CALL)) {
+    const diff = gitSync(dir, [
       "-c",
       "core.quotePath=false",
       "--literal-pathspecs",
@@ -149,14 +188,24 @@ const hunksSince = ({ root, since, paths }: LineCheck): Hunks | undefined => {
       "--src-prefix=a/",
       "--dst-prefix=b/",
       base.out,
-      ref,
+      commit,
       "--",
       ...batch,
     ]);
     if (!diff.ok) return undefined;
-    for (const [path, fileHunks] of parseHunks(diff.out)) hunks.set(path, fileHunks);
+    for (const [path, fileHunks] of parseHunks(diff.out))
+      hunks.push([path, fileHunks.map(toSaved)]);
   }
   return hunks;
+};
+
+const hunksSince = (run: Run, { root, since, paths }: LineCheck): Hunks | undefined => {
+  const commit = run.commits.get(rootKey(root));
+  if (!commit) return undefined;
+  const sorted = [...paths].sort();
+  const key = ["diff", root.dir, commit, since, ...sorted].join("\0");
+  const read = run.memo.read(key, HUNKS, () => readHunks(root.dir, commit, since, sorted));
+  return read && new Map(read.map(([path, hunks]) => [path, hunks.map(toHunk)]));
 };
 
 const lineState = (hunks: Hunks | undefined, path: string, lines: LineRange): RefState => {
@@ -171,9 +220,26 @@ const verdict = (refs: readonly { ref: CodeRef; state: RefState }[]): Drift => {
   return refs.some(({ state }) => state === "unknown") ? UNKNOWN : UNCHANGED;
 };
 
+/** The commit each root's ref points at now; results are cached under it. */
+const commitsOf = (items: readonly Watched[]): ReadonlyMap<string, string | undefined> => {
+  const roots = new Map(items.flatMap(({ refs }) => refs.map(({ root }) => [rootKey(root), root])));
+  return new Map(
+    [...roots].map(([key, root]) => {
+      if (!existsSync(root.dir)) return [key, undefined];
+      const ref = `${root.ref ?? HEAD}^{commit}`;
+      const parsed = gitSync(root.dir, ["rev-parse", "--verify", "--quiet", ref]);
+      return [key, parsed.ok ? parsed.out : undefined];
+    }),
+  );
+};
+
 const findDrifts = (index: StoreIndex): ReadonlyMap<Item, Drift> => {
   const items = watched(index);
-  const changes = changesByRoot(items);
+  const run: Run = {
+    commits: commitsOf(items),
+    memo: openCommitMemo(commitCachePath(index.root)),
+  };
+  const changes = changesByRoot(run, items);
   const assessed: Assessed[] = items.map(({ item, since, refs }) => ({
     item,
     since,
@@ -182,7 +248,10 @@ const findDrifts = (index: StoreIndex): ReadonlyMap<Item, Drift> => {
       state: fileState(changes.get(rootKey(ref.root)), ref.path, since),
     })),
   }));
-  const hunks = new Map([...lineChecks(assessed)].map(([key, check]) => [key, hunksSince(check)]));
+  const hunks = new Map(
+    [...lineChecks(assessed)].map(([key, check]) => [key, hunksSince(run, check)]),
+  );
+  run.memo.save();
   return new Map(
     assessed.map(({ item, since, refs }) => [
       item,

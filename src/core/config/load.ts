@@ -34,8 +34,11 @@ export const parseConfig = (source: string, origin: string): Config => {
   return ensureValid(parsed.data, origin);
 };
 
-export const loadConfig = async (path: string): Promise<Config> => {
+export const readConfigText = async (path: string): Promise<string> => {
   const file = Bun.file(path);
   if (!(await file.exists())) throw new TroveError(`no config at ${path}`);
-  return parseConfig(await file.text(), path);
+  return file.text();
 };
+
+export const loadConfig = async (path: string): Promise<Config> =>
+  parseConfig(await readConfigText(path), path);

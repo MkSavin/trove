@@ -39,16 +39,20 @@ export const indexDocuments = (
   verified,
 });
 
+/** `parsed` holds documents read earlier with the same config: one whose text is unchanged is reused. */
 export const buildIndex = async (
   root: string,
   config: Config,
   now?: string,
+  parsed?: ReadonlyMap<string, Document>,
 ): Promise<StoreIndex> => {
   const rels = await listDocuments(root, config);
   const documents = await Promise.all(
     rels.map(async (rel) => {
       const path = join(root, rel);
-      return parseDocument({ path, rel, text: await Bun.file(path).text() }, config);
+      const text = await Bun.file(path).text();
+      const known = parsed?.get(rel);
+      return known?.text === text ? known : parseDocument({ path, rel, text }, config);
     }),
   );
   return indexDocuments(root, config, documents, now, await readVerifications(root));
