@@ -36,9 +36,11 @@ export const columnLabel = (column: ReportColumn, index: StoreIndex): string =>
     .find((ledgerColumn) => ledgerColumn.key === column.key)?.label ??
   column.key;
 
-/** A drifted item's cell names what changed; filters still see `true`. */
+/** A drifted item's cell names what changed; filters still see `true` or `file`. */
 const driftCell = (drift: Drift): string | undefined => {
   if (drift.state === "true") return drift.changed.join(", ");
+  if (drift.state === "file")
+    return drift.changed.map((path) => `${path} (other lines)`).join(", ");
   return drift.state === "unknown" ? UNCHECKED : undefined;
 };
 

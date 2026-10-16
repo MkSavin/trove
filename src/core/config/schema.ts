@@ -103,12 +103,19 @@ const lifecycleStep = z.strictObject({
 });
 
 const ruleSetting = z.union([
-  severity.transform((level) => ({ level, since: undefined, limit: undefined })),
+  severity.transform((level) => ({
+    level,
+    since: undefined,
+    limit: undefined,
+    commits: undefined,
+  })),
   z.strictObject({
     level: severity,
     since: z.iso.date().optional(),
     /** A size or count the rule measures against, e.g. bytes for `item-size`. */
     limit: z.int().positive().optional(),
+    /** A number of commits, for `stale-check`. */
+    commits: z.int().positive().optional(),
   }),
 ]);
 

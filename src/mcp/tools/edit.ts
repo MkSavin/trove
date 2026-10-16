@@ -11,6 +11,7 @@ import { addItem } from "../../core/ops/item-add.ts";
 import { closeItem } from "../../core/ops/item-close.ts";
 import { deferItem } from "../../core/ops/item-defer.ts";
 import { moveItem } from "../../core/ops/item-move.ts";
+import { recheckItems } from "../../core/ops/item-recheck.ts";
 import type { Plan } from "../../core/ops/plan.ts";
 import { newSummary } from "../../core/summaries/summaries.ts";
 import {
@@ -26,7 +27,7 @@ import { guarded } from "../respond.ts";
 
 const EDIT = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
 
-const ITEM_ACTIONS = ["add", "close", "defer", "move"] as const;
+const ITEM_ACTIONS = ["add", "close", "defer", "move", "recheck"] as const;
 
 type ItemArgs = {
   action: (typeof ITEM_ACTIONS)[number];
@@ -37,6 +38,10 @@ type ItemArgs = {
   archive?: boolean | undefined;
   section?: string | undefined;
   as?: string | undefined;
+  ids?: string[] | undefined;
+  drifted?: boolean | undefined;
+  unchanged?: boolean | undefined;
+  filters?: Record<string, string | string[]> | undefined;
 };
 
 const required = <T>(value: T | undefined, what: string): T => {
@@ -63,6 +68,13 @@ const itemPlan = async (index: StoreIndex, args: ItemArgs): Promise<Plan> => {
       return moveItem(index, required(args.id, "id"), required(args.document, "document"), {
         archive: args.archive,
         section: args.section,
+      });
+    case "recheck":
+      return recheckItems(index, {
+        ids: [...(args.ids ?? []), ...(args.id ? [args.id] : [])],
+        drifted: args.drifted,
+        unchanged: args.unchanged,
+        filters: asFilters(args.filters),
       });
   }
 };
@@ -166,7 +178,7 @@ export const registerEditTools = (server: McpServer, context: Context): void => 
     "trove_item",
     {
       description:
-        "Ledger items. add: document + values by column key (priority, owner, what, …), gets the next id and a section stub; in a ledger with several tables, values.section names the heading of the table.  close: id, optional commit sha and as (how it was closed: a key of the ledger's closed outcomes, e.g. fixed or dropped; the first by default); a type with closeInto moves the row and section into the audit's resolved companion; archive=true when it is the audit's last open item. defer: id. move: id + document (the target ledger), section for its table; archive=true when the source is left without open items.",
+        "Ledger items. add: document + values by column key (priority, owner, what, …), gets the next id and a section stub; in a ledger with several tables, values.section names the heading of the table.  close: id, optional commit sha and as (how it was closed: a key of the ledger's closed outcomes, e.g. fixed or dropped; the first by default); a type with closeInto moves the row and section into the audit's resolved companion; archive=true when it is the audit's last open item. defer: id. move: id + document (the target ledger), section for its table; archive=true when the source is left without open items. recheck: id or ids, drifted=true for every open item with drift=true, filters for matching ones; sets each item's own checked cell to the commit its code is at now (today when it spans no root or several), so drift starts over; unchanged=true keeps only items whose code reads the same as at their check, whitespace aside. Needs a checked column in the ledger.",
       inputSchema: z.object({
         store: storeField,
         action: z.enum(ITEM_ACTIONS),
@@ -177,6 +189,10 @@ export const registerEditTools = (server: McpServer, context: Context): void => 
         archive: z.boolean().optional(),
         section: z.string().optional(),
         as: z.string().optional(),
+        ids: z.array(z.string()).optional(),
+        drifted: z.boolean().optional(),
+        unchanged: z.boolean().optional(),
+        filters: filtersField.optional(),
         dryRun: dryRunField,
       }),
       annotations: EDIT,

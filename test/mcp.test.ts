@@ -84,6 +84,27 @@ describe("mcp tools", () => {
     expect(await Bun.file(join(root, "BACKLOG.md")).text()).not.toContain("| WEB1-3 |");
   });
 
+  test("an item is rechecked once its ledger has a checked column", async () => {
+    const missing = await call("trove_item", { action: "recheck", id: "WEB1-4" });
+    expect(missing.error).toBe(true);
+    expect(missing.body).toContain("no checked column");
+
+    const config = join(root, "trove.yaml");
+    const text = await Bun.file(config).text();
+    await Bun.write(
+      config,
+      text.replace(
+        "    - { key: what, label: what is left, required: true }\n",
+        "    - { key: what, label: what is left, required: true }\n    - { key: checked, label: checked }\n",
+      ),
+    );
+    const done = (await call("trove_item", { action: "recheck", ids: ["WEB1-4"] })).data();
+    expect(done.written).toBe(true);
+    expect(done.notes[0]).toMatch(/^WEB1-4 checked at \d{4}-\d\d-\d\d$/);
+    const audit = await Bun.file(join(root, "audits/AUDIT_WEB_1.md")).text();
+    expect(audit).toContain("| what is left | checked |");
+  });
+
   test("refusals explain what is missing instead of writing", async () => {
     const archive = (
       await call("trove_transition", { document: "AUDIT_WEB_1", to: "archive" })
