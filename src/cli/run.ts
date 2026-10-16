@@ -17,6 +17,7 @@ import { migrate } from "./commands/migrate.ts";
 import { prompt } from "./commands/prompt.ts";
 import { query } from "./commands/query.ts";
 import { refresh } from "./commands/refresh.ts";
+import { refs } from "./commands/refs.ts";
 import { regulationCommand } from "./commands/regulation.ts";
 import { remote } from "./commands/remote.ts";
 import { report } from "./commands/report.ts";
@@ -47,6 +48,7 @@ const COMMANDS: readonly Command[] = [
   show,
   prompt,
   links,
+  refs,
   exportCommand,
   doc,
   item,

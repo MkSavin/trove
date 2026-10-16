@@ -74,6 +74,7 @@ A teammate runs `trove clone <store-url>` in their clone of the project: the sto
 | `trove report [name...]` · `trove rules` | Rebuild generated reports and every live generated block · list rules with their effective level. |
 | `trove refresh [doc...]` | Refill the generated blocks of the named documents, a summary past its date too, or of every live one; after a hand edit inside a block. |
 | `trove links [--dead]` | Relative links to documents and code; code is checked under `roots` present on this machine, in the checkout or, with `{ path, ref: origin/main }`, at that commit whatever branch is checked out; files git ignores there, such as installed packages, are read from the checkout. `--dead` ends with `N dead of M links`. |
+| `trove refs <file\|dir\|glob> [--lines A-B] [--all]` | Open items, and plans, specs and other ledger-less documents in work, that point at code, found the way drift finds references; a path is relative to the code root, to the working folder, or absolute. `--lines` keeps references that touch those lines or name none; `--all` adds closed items and archived documents. |
 | `trove export items [filters] --format csv\|json [--columns a,b]` | Rows for a CRM or a spreadsheet; RFC 4180 CSV. |
 
 **Edit.** Every edit patches only its own lines, keeps CRLF, is checked in memory first and is not written if it adds an error. Generated reports are rebuilt in the same step; `--dry-run` prints the line diff instead.
@@ -110,7 +111,7 @@ Commands find their store from the current folder: inside a store, then through 
 
 | tool | does |
 | ---- | ---- |
-| `trove_query` · `trove_show` | rows of items or documents by filters · one item's section, `DOC#heading`, or an outline |
+| `trove_query` · `trove_show` | rows of items or documents by filters, or with `kind: refs` what points at code, like `trove refs` · one item's section, `DOC#heading`, or an outline |
 | `trove_summary` | a summary of a configured kind, or one built from filters, without writing it |
 | `trove_check` · `trove_regulation` · `trove_prompt` | diagnostics · how this store works, generated from its config · a prompt's task text |
 | `trove_create` · `trove_update` · `trove_transition` | new document from a template · a header field · archive with link fixes |
@@ -260,6 +261,7 @@ A template is the body after the status line: Markdown, generated blocks and wri
 | `wait-refs` | warn | `blocked_by` and `until` name items, documents or closed items that exist |
 | `deferral-lifted` | warn | a deferral whose `until` is done |
 | `item-size` | off | an item's section stays within `limit` bytes, 2048 by default: `item-size: { level: warn, limit: 2048, since: 2026-10-15 }` |
+| `duplicate-suspect` | off | two open items look like one finding written twice: `limit` percent of the words of their `what` match (50 by default; case, punctuation and word endings aside, Russian and English alike), or half that when both name overlapping lines of one file; each pair is reported once, on the second item |
 | `prompt-body` | error | prompts carry the `<!-- prompt -->` marker |
 | `header-refs` | error | `refs` fields name existing documents |
 | `folder-type` | warn | documents match their folder's types and prefixes |

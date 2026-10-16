@@ -70,6 +70,25 @@ describe("mcp tools", () => {
     );
   });
 
+  test("query refs lists what points at code", async () => {
+    const refs = (
+      await call("trove_query", { kind: "refs", path: "web/src/composer", lines: "50-55" })
+    ).data();
+    expect(refs.rows).toEqual([
+      {
+        id: "WEB1-1",
+        what: 'A message sent while offline is dropped silently: no retry, no "not sent" mark',
+        status: "open",
+        document: "audits/AUDIT_WEB_1.md",
+        lines: "web/src/composer/send.ts:41-63",
+      },
+    ]);
+    expect(await call("trove_query", { kind: "refs" })).toMatchObject({
+      error: true,
+      body: "kind refs needs a path",
+    });
+  });
+
   test("an item closes with a dry run first, then for real", async () => {
     const dry = (await call("trove_item", { action: "close", id: "WEB1-3", dryRun: true })).data();
     expect(dry.written).toBe(false);

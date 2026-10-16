@@ -1,4 +1,5 @@
 import type { Rule } from "../rule.ts";
+import { duplicateSuspect } from "./duplicates.ts";
 import { fieldFormat, requiredField, unknownField } from "./fields.ts";
 import { folderType } from "./folders.ts";
 import { stale } from "./freshness.ts";
@@ -41,6 +42,7 @@ export const builtinRules: readonly Rule[] = [
   itemEnum,
   duplicateId,
   itemSize,
+  duplicateSuspect,
   promptBody,
   headerRefs,
   folderType,

@@ -1,7 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { TroveError } from "../../core/errors.ts";
+import { codeTarget, linesOption } from "../../core/index/code-target.ts";
+import { codeUsers } from "../../core/index/code-users.ts";
 import { excerpts, formatExcerpts } from "../../core/index/excerpt.ts";
+import type { StoreIndex } from "../../core/index/index.ts";
 import { findDocument } from "../../core/index/resolve.ts";
 import { KINDS, queryRows } from "../../core/index/rows.ts";
 import { regulation, TOPICS } from "../../core/regulation/regulation.ts";
@@ -13,28 +16,40 @@ import { guarded, json, text } from "../respond.ts";
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const;
 const DEFAULT_LIMIT = 50;
 const SEVERITY_ORDER = ["error", "warn", "info"] as const;
+const REFS = "refs";
 
 export const registerReadTools = (server: McpServer, context: Context): void => {
+  const refsTarget = (index: StoreIndex, path: string | undefined, lines: string | undefined) => {
+    if (path === undefined) throw new TroveError("kind refs needs a path");
+    return codeTarget(index, context.cwd, path, linesOption(lines));
+  };
+
   server.registerTool(
     "trove_query",
     {
       description:
-        "List ledger items or documents matching filters, as rows. Filter any field by value or vocabulary key, e.g. {status: 'open', owner: ['web', 'api']}; items also take drift ('true': code the item's row or section points at changed after its document's checked date; 'false': unchanged; 'unknown': nothing could be checked); documents also take place (work|archive), folder, type, stale ('true'), and for types with stages progress ('3/5') and next (the next stage).",
+        "List ledger items or documents matching filters, as rows. Filter any field by value or vocabulary key, e.g. {status: 'open', owner: ['web', 'api']}; items also take drift ('true': code the item's row or section points at changed after its document's checked date; 'false': unchanged; 'unknown': nothing could be checked); documents also take place (work|archive), folder, type, stale ('true'), and for types with stages progress ('3/5') and next (the next stage). kind 'refs' instead lists open items and plans, specs and other ledger-less documents in work that point at code `path` (a file, folder or glob such as 'web/src/**', relative to the project), with the lines they name; filters and fields do not apply.",
       inputSchema: z.object({
         store: storeField,
-        kind: z.enum(KINDS),
+        kind: z.enum([...KINDS, REFS]),
         filters: filtersField.optional(),
         fields: z
           .array(z.string())
           .optional()
           .describe("Columns to return; by default the columns of the matched items' ledgers"),
         limit: z.int().positive().optional(),
+        path: z.string().optional().describe("kind refs: the code file, folder or glob"),
+        lines: z.string().optional().describe("kind refs: only references touching lines 'A-B'"),
+        all: z.boolean().optional().describe("kind refs: closed items and archived documents too"),
       }),
       annotations: READ_ONLY,
     },
-    guarded(async ({ store, kind, filters, fields, limit }) => {
+    guarded(async ({ store, kind, filters, fields, limit, path, lines, all }) => {
       const opened = await openFor(context, store);
-      const { rows } = queryRows(opened.index, kind, asFilters(filters), fields);
+      const { rows } =
+        kind === REFS
+          ? codeUsers(opened.index, refsTarget(opened.index, path, lines), all ?? false)
+          : queryRows(opened.index, kind, asFilters(filters), fields);
       const cap = limit ?? DEFAULT_LIMIT;
       return json({ total: rows.length, rows: rows.slice(0, cap), truncated: rows.length > cap });
     }),

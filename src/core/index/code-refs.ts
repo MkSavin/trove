@@ -47,3 +47,10 @@ export const itemCodeRefs = (index: StoreIndex, doc: Document, item: Item): Code
   const texts = [...Object.values(item.values), ...sectionLines(doc, heading)];
   return unique([...links, ...codeSpanRefs(index, texts)]);
 };
+
+export const documentCodeRefs = (index: StoreIndex, doc: Document): CodeRef[] => {
+  const links = doc.links.filter((link) => !link.pin).flatMap((link) => linkRef(index, doc, link));
+  const fenced = fencedLines(doc.lines);
+  const texts = doc.lines.filter((line) => !fenced.has(line.number)).map((line) => line.text);
+  return unique([...links, ...codeSpanRefs(index, texts)]);
+};
