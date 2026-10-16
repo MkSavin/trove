@@ -14,6 +14,8 @@ export const frontMatter = defineRule({
 
 const LINE_BREAK = /\r?\n/;
 const TOP_LEVEL = /^[^\s#]/;
+/** An unquoted value with ` #`: YAML reads the rest as a comment and drops it. */
+const CUT_BY_COMMENT = /^[^\s#][^:]*:\s+[^"'\s].*\s#/;
 
 const parses = (yaml: string): boolean => {
   try {
@@ -39,11 +41,14 @@ export const frontMatterYaml = defineRule({
   check: (doc) => {
     if (!doc.frontMatter) return [];
     const lines = fieldLines(doc, doc.frontMatter.endLine);
-    if (parses(lines.map(({ text }) => text).join("\n"))) return [];
-    const broken = lines.filter(({ text }) => TOP_LEVEL.test(text) && !parses(text));
-    return (broken.length > 0 ? broken : [{ line: 1, text: "" }]).map(({ line }) => ({
+    const valid = parses(lines.map(({ text }) => text).join("\n"));
+    const broken = lines.filter(
+      ({ text }) => CUT_BY_COMMENT.test(text) || (!valid && TOP_LEVEL.test(text) && !parses(text)),
+    );
+    const found = broken.length > 0 || valid ? broken : [{ line: 1, text: "" }];
+    return found.map(({ line }) => ({
       line,
-      message: "front matter is not valid YAML: put a value holding `: ` or ` #` in quotes",
+      message: "a strict YAML reader breaks or cuts this value: put it in quotes",
     }));
   },
 });

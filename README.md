@@ -245,7 +245,7 @@ A template is the body after the status line: Markdown, generated blocks and wri
 | rule | default | checks |
 | ---- | ------- | ------ |
 | `front-matter` | error | the document opens with a `---` block |
-| `front-matter-yaml` | warn | the front matter is valid YAML, so other tools read it too; quote a value holding `: ` or ` #` |
+| `front-matter-yaml` | warn | strict YAML readers such as GitHub read the front matter as trove does: a value holding `: ` or ` #` is in quotes |
 | `required-field` | error | required fields of the type are present |
 | `field-format` | error | date fields hold a real `YYYY-MM-DD` |
 | `unknown-field` | warn | only declared fields appear |

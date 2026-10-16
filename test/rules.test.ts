@@ -107,5 +107,7 @@ describe("front-matter-yaml", () => {
   test("points at the field whose value needs quotes", () => {
     expect(check("verify: step 2: a test exists")).toMatchObject([{ line: 3, severity: "warn" }]);
     expect(check('verify: "step 2: a test exists"')).toEqual([]);
+    expect(check("verify: merged in PR #12")).toMatchObject([{ line: 3 }]);
+    expect(check("verify: issue#12 is closed")).toEqual([]);
   });
 });
