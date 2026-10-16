@@ -124,9 +124,9 @@ describe("summaries", () => {
   });
 
   test("a name that already carries the prefix is the whole file name", async () => {
-    for (const name of ["SUMMARY_MEETINGS_2026-10-16-dry", "SUMMARY_MEETINGS_2026-10-16-dry.md"]) {
+    for (const name of ["SUMMARY_WEEKLY_2026-10-16-draft", "SUMMARY_WEEKLY_2026-10-16-draft.md"]) {
       const plan = await newSummary(store.index, { kind: "web", name, keep: true });
-      expect(plan.changes[0]?.rel).toBe("summaries/SUMMARY_MEETINGS_2026-10-16-dry.md");
+      expect(plan.changes[0]?.rel).toBe("summaries/SUMMARY_WEEKLY_2026-10-16-draft.md");
     }
   });
 
