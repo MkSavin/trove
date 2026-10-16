@@ -103,8 +103,8 @@ describe("doc retype", () => {
     await Bun.write(
       config,
       (await config.text()).replace(
-        "capabilities: [status-line, freshness], initial: not-started }",
-        "capabilities: [status-line, freshness], initial: not-started, statuses: [not-started, in-progress, closed, archived] }",
+        "capabilities: [status-line, freshness, stages], initial: not-started }",
+        "capabilities: [status-line, freshness, stages], initial: not-started, statuses: [not-started, in-progress, closed, archived] }",
       ),
     );
     const reopened = await openStore({ cwd: store.root, store: store.root, today: TODAY });

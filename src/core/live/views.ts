@@ -33,6 +33,11 @@ const DEFAULTS = {
     sort: "type,path",
     format: "{document} — {status}",
   },
+  progress: {
+    columns: "document,bar:progress,next",
+    sort: "path",
+    format: "{document} {bar} — {next}",
+  },
 } as const satisfies Record<string, Layout>;
 
 const list = (value: string): string[] => value.split(",").filter(Boolean);
@@ -142,6 +147,15 @@ const VIEWS: Readonly<Record<string, View>> = {
       ),
       args,
       DEFAULTS.documents,
+      context,
+    ),
+  progress: (args, context) =>
+    grouped(
+      selectDocuments(context.index, filtersOf(args, context.base)).filter(
+        (doc) => doc.stages.length > 0 && doc.rel !== context.rel,
+      ),
+      args,
+      DEFAULTS.progress,
       context,
     ),
   counts: (args, context) =>

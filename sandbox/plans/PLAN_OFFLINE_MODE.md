@@ -13,11 +13,11 @@ verify: stage 1 starts with the outbox in `web/src/composer/send.ts` (WEB1-1)
 
 ## Stages
 
-| stage | what | done when |
-| ----- | ---- | --------- |
-| 1 | outbox with retries and a "not sent" mark | no message is lost across a reconnect |
-| 2 | last 50 threads cached for reading | threads open in airplane mode |
-| 3 | settings page reads cached prefs | settings open offline; closes WEB1-5 |
+| stage | what | done when | status |
+| ----- | ---- | --------- | ------ |
+| 1 | outbox with retries and a "not sent" mark | no message is lost across a reconnect | not started |
+| 2 | last 50 threads cached for reading | threads open in airplane mode | not started |
+| 3 | settings page reads cached prefs | settings open offline; closes WEB1-5 | not started |
 
 ## Risks
 

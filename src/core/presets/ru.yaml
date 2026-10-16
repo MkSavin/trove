@@ -64,7 +64,7 @@ types:
     fields:
       base: { required: true, format: refs }
   spec: { purpose: "Поведение, которое нужно построить, как договор. Реализована целиком — в архив; как система устроена сейчас, спека не описывает.", statuses: [not-started, in-progress, closed, archived], capabilities: [versions, status-line, freshness], initial: not-started }
-  plan: { purpose: "Работа по этапам, у каждого критерий готовности. Сюда же план процесса: раскатки, миграции.", statuses: [not-started, in-progress, closed, archived], capabilities: [status-line, freshness], initial: not-started }
+  plan: { purpose: "Работа по этапам, у каждого критерий готовности. Сюда же план процесса: раскатки, миграции.", statuses: [not-started, in-progress, closed, archived], capabilities: [status-line, freshness, stages], initial: not-started }
   research: { purpose: "Отчёт о проведённом исследовании: вопрос, что найдено, вывод или рекомендация. Исследование, которое ещё идёт, — это study; работа, которую предстоит сделать, — plan.", capabilities: [status-line, freshness] }
   incident: { purpose: "Разбор одного инцидента или жалобы по логам: хронология, причины, задачи заведены в других документах.", capabilities: [status-line, freshness] }
   study: { purpose: "Исследование, которое идёт или предстоит: вопрос, гипотезы, шаги, что замерить. Ответ оформляется отчётом research.", statuses: [in-progress, closed, archived], capabilities: [status-line, freshness], initial: in-progress }

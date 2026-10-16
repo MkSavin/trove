@@ -1,6 +1,7 @@
 import type { Document } from "../document/document.ts";
 import { staleDays } from "../document/freshness.ts";
 import type { Item } from "../document/ledger.ts";
+import { nextStage, progressBar, stageProgress } from "../document/progress.ts";
 import { driftedFiles } from "./drift.ts";
 import type { StoreIndex } from "./index.ts";
 import { fieldMatches } from "./match.ts";
@@ -37,6 +38,12 @@ export const documentField = (
       return doc.statusLine?.parsed?.note || undefined;
     case WAITING:
       return String(pendingRefs(index, doc.meta.blocked_by).length > 0);
+    case "progress":
+      return stageProgress(doc.stages);
+    case "bar":
+      return progressBar(doc.stages);
+    case "next":
+      return nextStage(doc.stages);
     default:
       return doc.meta[field];
   }

@@ -12,6 +12,7 @@ export const CAPABILITIES = [
   "status-line",
   "freshness",
   "generated",
+  "stages",
 ] as const;
 
 export const SEVERITIES = ["error", "warn", "info", "off"] as const;
@@ -151,6 +152,33 @@ const report = z.strictObject({
   sections: z.array(reportSection).min(1),
 });
 
+const STAGE_STATUS = ["status", "state", "статус", "состояние"];
+
+const STAGE_DONE = [
+  "done",
+  "merged",
+  "closed",
+  "complete",
+  "completed",
+  "shipped",
+  "✓",
+  "✔",
+  "✅",
+  "готово",
+  "сделано",
+  "выполнено",
+  "влит",
+  "влито",
+  "закрыт",
+  "закрыто",
+];
+
+/** How a plan's stages are read: status column headers of a stage table, and values meaning done. */
+const stages = z.strictObject({
+  status: z.array(z.string()).default(STAGE_STATUS),
+  done: z.array(z.string()).default(STAGE_DONE),
+});
+
 /** A code repository next to the store; with `ref`, links are checked against that commit. */
 const codeRoot = z.union([
   z.string().transform((path) => ({ path, ref: undefined })),
@@ -221,6 +249,7 @@ export const configSchema = z.strictObject({
   /** Folder of `<type>.md` files that replace the built-in template of a new document. */
   templates: z.string().optional(),
   summaries: z.record(z.string(), summary).default({}),
+  stages: stages.default({ status: STAGE_STATUS, done: STAGE_DONE }),
 });
 
 export type Config = z.output<typeof configSchema>;
@@ -236,3 +265,4 @@ export type ReportConfig = z.output<typeof report>;
 export type ReportSection = z.output<typeof reportSection>;
 export type ReportColumn = z.output<typeof reportColumn>;
 export type SummaryConfig = z.output<typeof summary>;
+export type StagesConfig = z.output<typeof stages>;

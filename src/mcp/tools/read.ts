@@ -19,7 +19,7 @@ export const registerReadTools = (server: McpServer, context: Context): void => 
     "trove_query",
     {
       description:
-        "List ledger items or documents matching filters, as rows. Filter any field by value or vocabulary key, e.g. {status: 'open', owner: ['web', 'api']}; items also take drift ('true': code linked from the item's section changed after its document's checked date); documents also take place (work|archive), folder, type, stale ('true').",
+        "List ledger items or documents matching filters, as rows. Filter any field by value or vocabulary key, e.g. {status: 'open', owner: ['web', 'api']}; items also take drift ('true': code linked from the item's section changed after its document's checked date); documents also take place (work|archive), folder, type, stale ('true'), and for types with stages progress ('3/5') and next (the next stage).",
       inputSchema: z.object({
         store: storeField,
         kind: z.enum(KINDS),
