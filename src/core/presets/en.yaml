@@ -29,6 +29,7 @@ fields:
   date: { required: true, format: date }
   checked: { required: true, format: date }
   verify: optional
+  owner: optional
   supersedes: { format: refs }
   superseded_by: { format: refs }
 
@@ -46,11 +47,11 @@ types:
     initial: current
     fields:
       base: { required: true, format: refs }
-  spec: { purpose: "The behaviour to build, as a contract. Archived once fully built; how the system works today is not a spec.", capabilities: [versions, status-line, freshness], initial: not-started }
-  plan: { purpose: "Work in stages, each with a done-when, including the plan of a process such as a rollout or a migration.", capabilities: [status-line, freshness], initial: not-started }
+  spec: { purpose: "The behaviour to build, as a contract. Archived once fully built; how the system works today is not a spec.", statuses: [not-started, in-progress, closed, archived], capabilities: [versions, status-line, freshness], initial: not-started }
+  plan: { purpose: "Work in stages, each with a done-when, including the plan of a process such as a rollout or a migration.", statuses: [not-started, in-progress, closed, archived], capabilities: [status-line, freshness], initial: not-started }
   research: { purpose: "The report of a finished investigation: the question, what was found, the conclusion or recommendation. An investigation still under way is a study; work to do is a plan.", capabilities: [status-line, freshness] }
   incident: { purpose: "One incident or complaint taken apart from logs: timeline, causes, follow-ups filed elsewhere.", capabilities: [status-line, freshness] }
-  study: { purpose: "An investigation still running or still to run: the question, hypotheses, steps and what to measure. Its answer goes into a research report.", capabilities: [status-line, freshness], initial: in-progress }
+  study: { purpose: "An investigation still running or still to run: the question, hypotheses, steps and what to measure. Its answer goes into a research report.", statuses: [in-progress, closed, archived], capabilities: [status-line, freshness], initial: in-progress }
   external: { purpose: "A report received from outside, kept as it came.", capabilities: [status-line, freshness], initial: current }
   prompt:
     purpose: "A large task for an AI agent that is run again, refined and handed to colleagues."
@@ -77,6 +78,8 @@ ledger:
     - { key: owner, label: owner, required: true }
     - { key: status, label: status, required: true, enum: [open, deferred] }
     - { key: what, label: what is left, required: true }
+    - { key: blocked_by, label: waits for }
+    - { key: until, label: until }
   closed: { fixed: fixed, dropped: dropped, moved: moved }
   note: "{status} {date}, {commit}"
 

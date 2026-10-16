@@ -85,12 +85,36 @@ describe("summaries", () => {
   });
 
   test("a new summary is a dated document of the summary type", async () => {
-    const plan = await newSummary(store.index, { kind: "outside-web" });
+    const plan = await newSummary(store.index, { kind: "outside-web", keep: true });
     expect(plan.changes.map((change) => change.rel)).toEqual([
       "summaries/SUMMARY_OUTSIDE_WEB_2026-10-15.md",
     ]);
     expect(plan.changes[0]?.text).toContain("type: summary\nstatus: current");
     expect(plan.changes[0]?.text).toContain("](../audits/AUDIT_API_2.md)");
+  });
+
+  test("a new summary archives the one it replaces, which names it", async () => {
+    const plan = await newSummary(store.index, { kind: "outside-web" });
+    expect(plan.changes.map((change) => change.rel)).toEqual([
+      "summaries/SUMMARY_OUTSIDE_WEB_2026-10-15.md",
+      ".archive/summaries/SUMMARY_OUTSIDE_WEB.md",
+    ]);
+    const archived = plan.changes[1]?.text ?? "";
+    expect(archived).toContain("status: archived\n");
+    expect(archived).toContain("superseded_by: SUMMARY_OUTSIDE_WEB_2026-10-15.md\n");
+    expect(plan.changes[1]?.from).toBe("summaries/SUMMARY_OUTSIDE_WEB.md");
+  });
+
+  test("--from latest carries the written analysis over and refills the blocks", async () => {
+    const plan = await newSummary(store.index, { kind: "outside-web", from: "latest", keep: true });
+    const text = plan.changes[0]?.text ?? "";
+    expect(text).toContain("Look first at API2-1: a refresh token that survives logout");
+    expect(text).toContain(`date: ${TODAY}\n`);
+    expect(text).toContain("](../audits/AUDIT_API_2.md)");
+    expect(text.match(/^\*\*Status:\*\*/gm)).toHaveLength(1);
+    await expect(newSummary(store.index, { kind: "outside-web", from: "NOPE" })).rejects.toThrow(
+      /no summary to start from: NOPE/,
+    );
   });
 
   test("an unknown kind or a taken name is refused", async () => {

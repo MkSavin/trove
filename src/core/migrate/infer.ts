@@ -13,6 +13,7 @@ import {
   fitRequired,
   fitStatusLabels,
   fitStatusLines,
+  fitTypeStatuses,
 } from "./fit.ts";
 
 export type Inferred = { language: Language; text: string; notes: readonly string[] };
@@ -95,6 +96,7 @@ export const inferConfig = async (
   const notes: string[] = [];
   const fitted = [
     fitFields,
+    fitTypeStatuses,
     fitRequired,
     fitStatusLines,
     fitLedger,

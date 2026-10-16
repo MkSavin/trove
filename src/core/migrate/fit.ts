@@ -103,6 +103,26 @@ export const fitStatusLines = (
   return { ...config, types };
 };
 
+/** A type that limits its statuses also takes the ones its documents carry. */
+export const fitTypeStatuses = (
+  config: ConfigInput,
+  index: StoreIndex,
+  notes: Notes,
+): ConfigInput => {
+  const types = { ...config.types };
+  for (const [name, type] of Object.entries(types)) {
+    if (!type.statuses) continue;
+    const seen = index.documents
+      .filter((doc) => doc.type === name && doc.meta.status !== undefined)
+      .map((doc) => keyOf(config.statuses ?? {}, doc.meta.status ?? "") ?? "");
+    const extra = [...new Set(seen)].filter((key) => key && !type.statuses?.includes(key)).sort();
+    if (extra.length === 0) continue;
+    types[name] = { ...type, statuses: [...type.statuses, ...extra] };
+    notes.push(`type ${name} also takes ${extra.join(", ")}: its documents use them`);
+  }
+  return { ...config, types };
+};
+
 /** When the documents use status keys rather than the preset's labels, labels become the keys. */
 export const fitStatusLabels = (
   config: ConfigInput,

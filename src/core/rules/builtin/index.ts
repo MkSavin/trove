@@ -20,6 +20,7 @@ import { headerRefs } from "./references.ts";
 import { itemSize } from "./size.ts";
 import { statusLine } from "./status-line.ts";
 import { knownStatus, knownType, typeStatus } from "./vocabulary.ts";
+import { deferralLifted, waitRefs } from "./waiting.ts";
 
 export const builtinRules: readonly Rule[] = [
   frontMatter,
@@ -47,5 +48,7 @@ export const builtinRules: readonly Rule[] = [
   liveBlock,
   liveBlockStale,
   writePlace,
+  waitRefs,
+  deferralLifted,
   stale,
 ];

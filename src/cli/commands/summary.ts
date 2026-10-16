@@ -7,15 +7,28 @@ import { openFromFlags } from "../store.ts";
 
 const isFilter = (arg: string): boolean => arg.includes("=");
 
-const OPTIONS = { ...OP_OPTIONS, title: { type: "string" }, name: { type: "string" } } as const;
+const OPTIONS = {
+  ...OP_OPTIONS,
+  title: { type: "string" },
+  name: { type: "string" },
+  from: { type: "string" },
+  keep: { type: "boolean", default: false },
+} as const;
 
 const request = (
   positionals: readonly string[],
-  values: { title?: string | undefined; name?: string | undefined },
+  values: {
+    title?: string | undefined;
+    name?: string | undefined;
+    from?: string | undefined;
+    keep?: boolean | undefined;
+  },
 ) => ({
   kind: positionals.find((arg) => !isFilter(arg)),
   title: values.title,
   name: values.name,
+  from: values.from,
+  keep: values.keep,
   filters: parseFilters(positionals.filter(isFilter)),
 });
 
@@ -33,9 +46,10 @@ const summaryShow: Command = {
 
 const summaryNew: Command = {
   name: "new",
-  summary: "Create a summary document of a kind: generated blocks filled, places left to write",
+  summary:
+    "Create a summary of a kind, archiving the one it replaces: blocks filled, places left to write",
   usage:
-    "trove summary new <kind> [field=value...] [--title TEXT] [--name STEM_AFTER_PREFIX] [--dry-run]",
+    "trove summary new <kind> [field=value...] [--from latest|DOC] [--keep] [--title TEXT] [--name STEM_AFTER_PREFIX] [--dry-run]",
   run: async (argv, io) => {
     const { values, positionals } = parse(argv, OPTIONS);
     const store = await openFromFlags(values, io);

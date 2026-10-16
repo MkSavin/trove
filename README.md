@@ -82,7 +82,7 @@ A teammate runs `trove clone <store-url>` in their clone of the project: the sto
 | `trove doc new <type> <topic> [--scope] [--field k=v]` | A document from the type's template: folder, prefix, next series number, slug. The name is the topic's first eight words in capitals, Cyrillic transliterated (`чего не хватает` → `CHEGO_NE_KHVATAET`); other scripts need `--name`. |
 | `trove doc archive <doc> [--status closed]` | Move into the archive mirror, set the status, fix relative links on both sides. A status that `lifecycle` archives the type under, such as a closed plan's, is kept; `--status` sets one in the same step. |
 | `trove doc retype <doc> <type>` | Turn a document into another type, e.g. research that became a plan of work: folder, prefix, status, title, links and references follow. |
-| `trove summary new <kind> [filters] [--name]` | A dated summary document of that kind: its generated blocks filled, `<!-- write: … -->` places left for the analysis. |
+| `trove summary new <kind> [filters] [--from latest\|DOC] [--keep] [--name]` | A dated summary document of that kind: its generated blocks filled, `<!-- write: … -->` places left for the analysis. `--from latest` starts from the written text of the last summary of the kind. The summaries of the kind still in work go to the archive, each naming its successor in `superseded_by`; `--keep` leaves them. |
 | `trove doc checked <doc>` · `trove doc set <doc> <field> <value>` | Re-checked today · any header field; `status` also updates the status line. |
 | `trove item add <doc> column=value...` | A ledger row with the next free id and a section stub (`ledger.heading`, `ledger.stub`). Numbers of closed items are never reused. |
 | `trove item close <id> [--as OUTCOME] [--commit SHA] [--archive]` | Drop the row and list other mentions. A type with `closeInto` moves the row and the section into its resolved companion; others mark the section closed in place. `--as` names the outcome (`fixed`, `dropped`, `moved`); `--archive` when it was the last open item. |
@@ -92,6 +92,8 @@ A teammate runs `trove clone <store-url>` in their clone of the project: the sto
 | `trove sync [-m TEXT]` | Commit hand edits together with rebuilt reports, then push by mode. Refuses while `check` is red. |
 
 **Filters** work the same in `query`, `summary`, `export`, report configs, generated blocks and MCP tools: `field=value` matches the raw text or the vocabulary key (`status=open` and `status=открыто` are the same), `~text` a substring, `*` and `**` a glob, and `!` in front excludes. Items also filter on their document's fields: `owner=web path=!audits/mobile/**` is everything for the web team outside the mobile audits. Repeat a field or use commas for alternatives. Closed items are left out unless a filter names `state` (`state=closed`, `state=open,closed`).
+
+**Waiting.** An item (a `blocked_by` ledger column) or a document (a `blocked_by` header field) names the ids or documents it waits for; `waiting=true` holds while one of them is still open or in work, so a block can split what can start now from what waits. A deferral names what ends it in `until`; once all of it is done, `deferral-lifted` says so. Documents also take `owner` and give `note`, the text of their status line after the status word, as a column or `format` placeholder.
 
 Commands find their store from the current folder: inside a store, then through the project's pointer, `.trove.yaml` or `.git/trove.yaml` (by `scope` when there are several), then through the registry, then a store next to the project whose `roots` name it. `--store <name|dir>` or `$TROVE_STORE` overrides.
 
@@ -210,7 +212,7 @@ reports:
 
 ### Summaries
 
-A summary is a dated document of the `summary` type: generated blocks for the status, written paragraphs for the analysis. A kind fixes its title, base filter and template; `trove summary new weekly` creates `summaries/SUMMARY_WEEKLY_<date>.md` with every block filled and `<!-- write: … -->` places for the rest, which the `write-place` rule reports until they are written up.
+A summary is a dated document of the `summary` type: generated blocks for the status, written paragraphs for the analysis. A kind fixes its title, base filter and template; `trove summary new weekly` creates `summaries/SUMMARY_WEEKLY_<date>.md` with every block filled and `<!-- write: … -->` places for the rest, which the `write-place` rule reports until they are written up. The previous weekly summary goes to the archive; `--from latest` carries its written analysis over to be edited instead of written from scratch.
 
 ```yaml
 summaries:
@@ -243,6 +245,8 @@ A template is the body after the status line: Markdown, generated blocks and wri
 | `id-format` | error | ids follow `ledger.id` |
 | `item-enum` | error | cells with a vocabulary hold one of its values |
 | `duplicate-id` | error | ids are unique across the store |
+| `wait-refs` | warn | `blocked_by` and `until` name items, documents or closed items that exist |
+| `deferral-lifted` | warn | a deferral whose `until` is done |
 | `item-size` | off | an item's section stays within `limit` bytes, 2048 by default: `item-size: { level: warn, limit: 2048, since: 2026-10-15 }` |
 | `prompt-body` | error | prompts carry the `<!-- prompt -->` marker |
 | `header-refs` | error | `refs` fields name existing documents |
