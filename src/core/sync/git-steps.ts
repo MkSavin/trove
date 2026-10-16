@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { git, gitOrThrow, toplevel } from "../git/git.ts";
 import { samePath } from "../text/real-path.ts";
 import { settleLiveConflict } from "./settle-live.ts";
@@ -10,13 +12,22 @@ export const isRepositoryRoot = async (root: string): Promise<boolean> => {
   return top !== undefined && samePath(top, root);
 };
 
+/** On disk or known to git; a never-committed file moved away is neither and would fail `git add`. */
+const stageable = async (root: string, paths: readonly string[]): Promise<string[]> => {
+  const known = await git(root, ["ls-files", "-z", "--cached", "--", ...paths]);
+  const tracked = new Set(known.out.split("\0").filter(Boolean));
+  return paths.filter((path) => tracked.has(path) || existsSync(join(root, path)));
+};
+
 /** Stages the paths (deletions included) and commits them; nothing staged means no commit. */
 export const commitPaths = async (
   root: string,
   paths: readonly string[] | "all",
   message: string,
 ): Promise<Committed> => {
-  await gitOrThrow(root, paths === "all" ? ["add", "--all"] : ["add", "--all", "--", ...paths]);
+  const staged = paths === "all" ? "all" : await stageable(root, paths);
+  if (staged !== "all" && staged.length === 0) return { sha: undefined, error: undefined };
+  await gitOrThrow(root, staged === "all" ? ["add", "--all"] : ["add", "--all", "--", ...staged]);
   if ((await git(root, ["diff", "--cached", "--quiet"])).ok)
     return { sha: undefined, error: undefined };
   const done = await git(root, ["commit", "--quiet", "-m", message]);

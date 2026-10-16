@@ -138,9 +138,13 @@ describe("links", () => {
     expect(resolved.find((link) => link.target.endsWith("send.ts"))?.state).toBe("ok");
     expect(resolved.find((link) => link.target.endsWith("threads.ts"))?.state).toBe("dead");
 
-    await Bun.write(join(harbor, ".gitignore"), "web/src/stores/\n");
     await mkdir(join(harbor, "web", "src", "stores"), { recursive: true });
     await Bun.write(join(harbor, "web", "src", "stores", "threads.ts"), "export {};\n");
+    const onBranch = await openStore({ cwd: store.root, store: store.root, today: TODAY });
+    const unmerged = resolveLinks(onBranch.index, doc);
+    expect(unmerged.find((link) => link.target.endsWith("threads.ts"))?.state).toBe("unmerged");
+
+    await Bun.write(join(harbor, ".gitignore"), "web/src/stores/\n");
     const ignored = await openStore({ cwd: store.root, store: store.root, today: TODAY });
     const again = resolveLinks(ignored.index, doc);
     expect(again.find((link) => link.target.endsWith("threads.ts"))?.state).toBe("ok");

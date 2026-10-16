@@ -10,7 +10,7 @@ import { formatTable } from "../format/table.ts";
 import { OP_OPTIONS, runPlan } from "../ops.ts";
 import { openFromFlags } from "../store.ts";
 
-const STATE_STYLE = { ok: "green", dead: "red", unchecked: "dim" } as const;
+const STATE_STYLE = { ok: "green", dead: "red", unchecked: "dim", unmerged: "yellow" } as const;
 
 export const links: Command = {
   name: "links",

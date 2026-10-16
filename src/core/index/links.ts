@@ -8,8 +8,11 @@ import type { LineRange } from "../text/line-range.ts";
 import type { StoreIndex } from "./index.ts";
 
 export type LinkKind = "document" | "store" | "code" | "outside";
-/** `unchecked`: outside the store and outside every code root present on this machine. */
-export type LinkState = "ok" | "dead" | "unchecked";
+/**
+ * `unchecked`: outside the store and outside every code root present on this machine.
+ * `unmerged`: missing at the root's ref but present in its checkout, e.g. on a branch not merged yet.
+ */
+export type LinkState = "ok" | "dead" | "unchecked" | "unmerged";
 
 export type ResolvedLink = {
   file: string;
@@ -91,7 +94,8 @@ const codeState = (
   if (!existsFor(index, root.dir)) return "unchecked";
   if (pin) return stateAt(index, root, absolute, pinnedRef(pin));
   if (!root.ref) return existsFor(index, absolute) ? "ok" : "dead";
-  return stateAt(index, root, absolute, root.ref);
+  const state = stateAt(index, root, absolute, root.ref);
+  return state === "dead" && existsFor(index, absolute) ? "unmerged" : state;
 };
 
 const classify = (

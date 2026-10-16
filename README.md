@@ -268,7 +268,7 @@ A template is the body after the status line: Markdown, generated blocks and wri
 | `prompt-body` | error | prompts carry the `<!-- prompt -->` marker |
 | `header-refs` | error | `refs` fields name existing documents |
 | `folder-type` | warn | documents match their folder's types and prefixes |
-| `dead-link` | warn | relative links reach a file in the store or in a code root checked out here |
+| `dead-link` | warn | relative links reach a file in the store or in a code root checked out here; a file missing at the root's `ref` but present in its checkout (a branch not merged yet) is `unmerged` in `trove links`, not dead |
 | `live-block` | error | generated `<!-- trove:… -->` blocks are closed and name a known view with valid options |
 | `live-block-stale` | warn | generated blocks match the store; edits inside them are overwritten by the next report |
 | `write-place` | warn | places left for written analysis, `<!-- write: … -->`, are written up |

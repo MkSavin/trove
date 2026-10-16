@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git } from "../src/core/git/git.ts";
 import { applyPlan } from "../src/core/ops/apply.ts";
+import { archivePlan } from "../src/core/ops/doc-archive.ts";
 import { setDocumentField } from "../src/core/ops/doc-set.ts";
 import { closeItem } from "../src/core/ops/item-close.ts";
 import type { Plan } from "../src/core/ops/plan.ts";
@@ -74,6 +75,21 @@ describe("sync after an operation", () => {
     expect((await log(root))[0]).toBe("docs: check RISKS");
     expect((await git(root, ["show", "--name-only", "--format="])).out).toBe("RISKS.md");
     expect((await log(remote, "main"))[0]).toBe("docs: base");
+  });
+
+  test("archiving a document never committed commits its new place", async () => {
+    const root = await storeWithRemote("commit");
+    await git(root, ["rm", "--quiet", "--cached", "plans/PLAN_OFFLINE_MODE.md"]);
+    await git(root, ["commit", "--quiet", "-m", "docs: untrack"]);
+    const result = await run(root, (s) => {
+      const doc = s.index.byName.get("PLAN_OFFLINE_MODE.md");
+      if (!doc) throw new Error("the sandbox has the plan");
+      return archivePlan(s.index, doc);
+    });
+    expect(result.commit).toBeDefined();
+    const shown = (await git(root, ["show", "--name-only", "--format="])).out;
+    expect(shown).toContain(".archive/plans/PLAN_OFFLINE_MODE.md");
+    expect((await git(root, ["status", "--porcelain"])).out).toBe("");
   });
 
   test("push mode pushes after rebasing over unrelated work", async () => {
