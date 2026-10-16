@@ -17,5 +17,14 @@ export const anchorRange = (anchor: string | undefined): LineRange | undefined =
   return match ? lineRange(match[1], match[2]) : undefined;
 };
 
+/** `40` or `40-55`, as typed on the command line. */
+export const parseRange = (text: string): LineRange | undefined => {
+  const match = /^(\d+)(?:-(\d+))?$/.exec(text.trim());
+  return match ? lineRange(match[1], match[2]) : undefined;
+};
+
+export const rangesOverlap = (a: LineRange, b: LineRange): boolean =>
+  a.from <= b.to && b.from <= a.to;
+
 export const rangeText = ({ from, to }: LineRange): string =>
   from === to ? String(from) : `${from}-${to}`;
