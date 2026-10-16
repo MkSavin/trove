@@ -16,6 +16,10 @@ export const isDocument = (row: ReportRow): row is Document => "rel" in row;
 const linkTo = (rel: string, outputDir: string): string =>
   `[${basename(rel, ".md")}](${posix.relative(outputDir, rel)})`;
 
+/** A link while the document exists; an item that left the store keeps only its old name. */
+export const documentCell = (rel: string, index: StoreIndex, outputDir: string): string =>
+  index.byRel.has(rel) ? linkTo(rel, outputDir) : basename(rel, ".md");
+
 /** Groups of documents read as links to them; other groups as their value. */
 export const groupTitle = (name: string, key: string, outputDir: string): string =>
   key === DOCUMENT_COLUMN && name ? linkTo(name, outputDir) : name;
@@ -39,6 +43,8 @@ export const cellText = (
 ): string => {
   const rel = isDocument(row) ? row.rel : row.document;
   const value =
-    column.key === DOCUMENT_COLUMN ? linkTo(rel, outputDir) : rowField(row, column.key, index);
+    column.key === DOCUMENT_COLUMN
+      ? documentCell(rel, index, outputDir)
+      : rowField(row, column.key, index);
   return value ? value.replaceAll("|", "\\|") : (column.empty ?? EMPTY);
 };

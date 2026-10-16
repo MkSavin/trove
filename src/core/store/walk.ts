@@ -16,22 +16,23 @@ const ignoredBy = (patterns: readonly string[]) => {
     names.has(name) || globs.some((glob) => glob.match(rel));
 };
 
-/** Store-relative paths of every document; hidden folders other than the archive are skipped. */
-export const listDocuments = async (root: string, config: Config): Promise<string[]> => {
+/** Whether a store-relative `.md` path is a document: hidden folders other than the archive are not. */
+export const documentPath = (config: Config): ((rel: string) => boolean) => {
   const ignored = ignoredBy(config.ignore);
   const outputs = new Set(Object.values(config.reports).map((report) => report.output));
-  const found = await Array.fromAsync(MARKDOWN.scan({ cwd: root, dot: true }));
+  return (rel) => {
+    const segments = rel.split("/");
+    const name = segments.pop() ?? "";
+    return (
+      name.endsWith(".md") &&
+      segments.every((segment, depth) => isVisibleDirectory(segment, depth, config)) &&
+      !ignored(rel, name) &&
+      !outputs.has(rel)
+    );
+  };
+};
 
-  return found
-    .map(toPosix)
-    .filter((rel) => {
-      const segments = rel.split("/");
-      const name = segments.pop() ?? "";
-      return (
-        segments.every((segment, depth) => isVisibleDirectory(segment, depth, config)) &&
-        !ignored(rel, name) &&
-        !outputs.has(rel)
-      );
-    })
-    .sort();
+export const listDocuments = async (root: string, config: Config): Promise<string[]> => {
+  const found = await Array.fromAsync(MARKDOWN.scan({ cwd: root, dot: true }));
+  return found.map(toPosix).filter(documentPath(config)).sort();
 };

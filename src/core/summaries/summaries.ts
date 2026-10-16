@@ -3,6 +3,7 @@ import { TroveError } from "../errors.ts";
 import { mergeFilters } from "../index/filters.ts";
 import type { StoreIndex } from "../index/index.ts";
 import type { Filters } from "../index/query.ts";
+import { withGitData } from "../live/git-data.ts";
 import { initialStatus } from "../ops/doc-new.ts";
 import { placementOf } from "../ops/naming.ts";
 import type { Plan } from "../ops/plan.ts";
@@ -62,7 +63,8 @@ export const newSummary = async (index: StoreIndex, request: SummaryRequest): Pr
   if (index.byName.has(`${stem}.md`))
     throw new TroveError(`${stem}.md already exists: pass a name`);
   const rel = folder ? `${folder}/${stem}.md` : `${stem}.md`;
-  const text = refreshGenerated(await draftText(index, request), rel, index);
+  const draft = await draftText(index, request);
+  const text = refreshGenerated(draft, rel, await withGitData(index, [{ rel, text: draft }]));
   return {
     changes: [{ rel, text }],
     notes: [`created ${rel}: fill the <!-- write: … --> places`],
@@ -70,5 +72,8 @@ export const newSummary = async (index: StoreIndex, request: SummaryRequest): Pr
   };
 };
 
-export const showSummary = async (index: StoreIndex, request: SummaryRequest): Promise<string> =>
-  refreshGenerated(await draftText(index, request), "SUMMARY.md", index);
+export const showSummary = async (index: StoreIndex, request: SummaryRequest): Promise<string> => {
+  const rel = "SUMMARY.md";
+  const draft = await draftText(index, request);
+  return refreshGenerated(draft, rel, await withGitData(index, [{ rel, text: draft }]));
+};

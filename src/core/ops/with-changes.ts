@@ -18,12 +18,15 @@ export const withChanges = (index: StoreIndex, changes: readonly Change[]): Stor
         ],
   );
   const documents = [...index.documents.filter((doc) => !gone.has(doc.rel)), ...added];
-  return indexDocuments(
-    index.root,
-    index.config,
-    documents.toSorted((a, b) => compareText(a.rel, b.rel)),
-    index.today,
-  );
+  return {
+    ...indexDocuments(
+      index.root,
+      index.config,
+      documents.toSorted((a, b) => compareText(a.rel, b.rel)),
+      index.today,
+    ),
+    gitData: index.gitData,
+  };
 };
 
 /** Folds one change into the list: an edit or move of a file the list already changes replaces that change. */

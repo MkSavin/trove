@@ -159,7 +159,9 @@ By default trove leaves no trace in the project tree: the link lives in `.git/tr
 <!-- /trove:items -->
 ```
 
-Views are `items`, `documents`, `counts` (`by=priority`) and `placement`; `as=table|list|ids`, `columns` (`document:audit` relabels one), `label` (the first column of `counts`), `group`, `sort` and `format="{id} — {what}"` lay them out, every other option is a filter. A `filter:` header field adds to every block of the document. Every edit and report run refills the blocks; archived documents keep theirs as a snapshot, and so does a summary once its `date` has passed: it is a look at that day, and a new one is `trove summary new`. A rebase conflict inside a block settles itself.
+Views are `items`, `documents`, `counts` (`by=priority`), `placement`, `branches` and `changes`; `as=table|list|ids`, `columns` (`document:audit` relabels one), `label` (the first column of `counts`), `group`, `sort` and `format="{id} — {what}"` lay them out, every other option is a filter. A `filter:` header field adds to every block of the document. Every edit and report run refills the blocks; archived documents keep theirs as a snapshot, and so does a summary once its `date` has passed: it is a look at that day, and a new one is `trove summary new`. A rebase conflict inside a block settles itself.
+
+Two views read git, once per run and only when a document holds them. `branches` lists the local and remote-tracking branches of a code root that match `pattern`, one row each with the commits not in each base and the date of the last commit, newest first: `<!-- trove:branches root=app pattern=feature/* against=origin/develop,origin/main -->`. A root not checked out on this machine leaves the block as it is. `changes` lists the items closed, added and moved to a document of another name since a starting point, from the store's own history: `since=previous`, the default, is the commit that added the previous summary of the same kind, or its date when it was never committed; `since=<date>` and `since=<commit>` work too. It is laid out like `items`, with a `change` column and `from` for moves, and takes the same filters. An unknown root, base or starting point is a `live-block` error.
 
 **Report.** A query plus a layout. `BACKLOG.md` is the open items grouped by owner; a prompts index is the prompt documents sorted by path.
 
@@ -220,7 +222,7 @@ summaries:
     template: .trove/templates/web.md      # built-in layout when omitted
 ```
 
-A template is the body after the status line: Markdown, generated blocks and write places; `{{title}}`, `{{date}}` and `{{kind}}` are filled in.
+A template is the body after the status line: Markdown, generated blocks and write places; `{{title}}`, `{{date}}` and `{{kind}}` are filled in. `<!-- trove:changes -->` in it shows what was closed, added and moved since the previous summary of the kind.
 
 ## Rules
 
