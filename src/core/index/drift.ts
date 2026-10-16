@@ -1,47 +1,42 @@
 import { existsSync } from "node:fs";
-import { relative, resolve, sep } from "node:path";
-import type { Document } from "../document/document.ts";
 import type { Item } from "../document/ledger.ts";
 import { gitSync } from "../git/git.ts";
+import { type Hunk, parseHunks, touches, WHOLE_FILE } from "../git/hunks.ts";
 import { isIsoDate } from "../text/dates.ts";
+import type { LineRange } from "../text/line-range.ts";
+import { itemCodeRefs, refText } from "./code-refs.ts";
 import type { StoreIndex } from "./index.ts";
-import { type CodeRoot, codeRoot, linkTarget } from "./links.ts";
-import { itemHeading } from "./resolve.ts";
+import { type CodeRef, type CodeRoot, rootKey } from "./links.ts";
 
-type CodeLink = { root: CodeRoot; path: string };
+/** `true` names what changed; `unknown` when nothing the item points at could be checked. */
+export type Drift = { state: "true"; changed: readonly string[] } | { state: "false" | "unknown" };
 
-type Watched = { item: Item; since: string; links: readonly CodeLink[] };
+type RefState = "changed" | "unchanged" | "unknown";
+
+type Watched = { item: Item; since: string; refs: readonly CodeRef[] };
+
+type Assessed = { item: Item; since: string; refs: readonly { ref: CodeRef; state: RefState }[] };
 
 /** Changed file → the date of its latest change. */
 type Changes = ReadonlyMap<string, string>;
 
+type Hunks = ReadonlyMap<string, readonly Hunk[]>;
+
+type LineCheck = { root: CodeRoot; since: string; paths: Set<string> };
+
 const HEAD = "HEAD";
+const UNKNOWN: Drift = { state: "unknown" };
+const UNCHANGED: Drift = { state: "false" };
 /** Keeps each git command line well under the Windows limit. */
 const PATHS_PER_CALL = 100;
-
-const rootKey = ({ dir, ref }: CodeRoot): string => `${dir}\0${ref ?? HEAD}`;
-
-/** Pinned links point at a past commit on purpose, so later changes are not drift. */
-const sectionCodeLinks = (index: StoreIndex, doc: Document, item: Item): CodeLink[] => {
-  const heading = itemHeading(doc, item.id);
-  if (!heading) return [];
-  return doc.links
-    .filter((link) => !link.pin && link.start >= heading.start && link.start < heading.end)
-    .flatMap((link) => {
-      const absolute = resolve(index.root, linkTarget(doc, link));
-      const root = codeRoot(index, absolute);
-      const path = root ? relative(root.dir, absolute).split(sep).join("/") : "";
-      return root && path && existsSync(root.dir) ? [{ root, path }] : [];
-    });
-};
 
 const watched = (index: StoreIndex): Watched[] =>
   index.items.flatMap((item) => {
     const doc = index.byRel.get(item.document);
     const since = doc?.meta.checked;
     if (!doc || since === undefined || !isIsoDate(since)) return [];
-    const links = sectionCodeLinks(index, doc, item);
-    return links.length > 0 ? [{ item, since, links }] : [];
+    const refs = itemCodeRefs(index, doc, item);
+    return refs.length > 0 ? [{ item, since, refs }] : [];
   });
 
 const chunks = <T>(values: readonly T[], size: number): T[][] =>
@@ -59,7 +54,12 @@ const readLog = (out: string, into: Map<string, string>): void => {
   }
 };
 
-const changesAt = (root: CodeRoot, paths: readonly string[], since: string): Changes => {
+/** Missing when git cannot read the root, e.g. its ref is unknown here. */
+const changesAt = (
+  root: CodeRoot,
+  paths: readonly string[],
+  since: string,
+): Changes | undefined => {
   const changes = new Map<string, string>();
   for (const batch of chunks(paths, PATHS_PER_CALL)) {
     const log = gitSync(root.dir, [
@@ -75,16 +75,18 @@ const changesAt = (root: CodeRoot, paths: readonly string[], since: string): Cha
       "--",
       ...batch,
     ]);
-    if (log.ok) readLog(log.out, changes);
+    if (!log.ok) return undefined;
+    readLog(log.out, changes);
   }
   return changes;
 };
 
-/** One git log per code root, from the earliest `checked` date of the items linking into it. */
-const changesByRoot = (items: readonly Watched[]): ReadonlyMap<string, Changes> => {
+/** One git log per code root on this machine, from the earliest `checked` date pointing into it. */
+const changesByRoot = (items: readonly Watched[]): ReadonlyMap<string, Changes | undefined> => {
   const roots = new Map<string, { root: CodeRoot; paths: Set<string>; since: string }>();
-  for (const { since, links } of items) {
-    for (const { root, path } of links) {
+  for (const { since, refs } of items) {
+    for (const { root, path } of refs) {
+      if (!existsSync(root.dir)) continue;
       const key = rootKey(root);
       const entry = roots.get(key) ?? { root, paths: new Set<string>(), since };
       entry.paths.add(path);
@@ -97,33 +99,112 @@ const changesByRoot = (items: readonly Watched[]): ReadonlyMap<string, Changes> 
   );
 };
 
-/** A linked folder drifts when anything inside it changed. */
-const changedAfter = (changes: Changes | undefined, path: string, since: string): boolean =>
-  [...(changes ?? [])].some(
+/** A linked folder changed when anything inside it changed. */
+const fileState = (changes: Changes | undefined, path: string, since: string): RefState => {
+  if (!changes) return "unknown";
+  const changed = [...changes].some(
     ([file, date]) => date > since && (file === path || file.startsWith(`${path}/`)),
   );
+  return changed ? "changed" : "unchanged";
+};
 
-const findDrifts = (index: StoreIndex): ReadonlyMap<Item, readonly string[]> => {
+const lineKey = (root: CodeRoot, since: string): string => `${rootKey(root)}\0${since}`;
+
+/** Files that changed and whose references name lines: only those need a diff. */
+const lineChecks = (items: readonly Assessed[]): Map<string, LineCheck> => {
+  const checks = new Map<string, LineCheck>();
+  for (const { since, refs } of items) {
+    for (const { ref, state } of refs) {
+      if (state !== "changed" || !ref.lines) continue;
+      const key = lineKey(ref.root, since);
+      const check = checks.get(key) ?? { root: ref.root, since, paths: new Set<string>() };
+      check.paths.add(ref.path);
+      checks.set(key, check);
+    }
+  }
+  return checks;
+};
+
+/**
+ * Line numbers were written against the code as of `checked`, so the diff runs from the last
+ * commit on or before that day; its old-side hunks are in exactly those numbers.
+ */
+const hunksSince = ({ root, since, paths }: LineCheck): Hunks | undefined => {
+  const ref = root.ref ?? HEAD;
+  const base = gitSync(root.dir, ["rev-list", "-1", `--before=${since}T23:59:59`, ref]);
+  if (!base.ok) return undefined;
+  if (!base.out) return new Map([...paths].map((path) => [path, [WHOLE_FILE]]));
+  const hunks = new Map<string, readonly Hunk[]>();
+  for (const batch of chunks([...paths], PATHS_PER_CALL)) {
+    const diff = gitSync(root.dir, [
+      "-c",
+      "core.quotePath=false",
+      "--literal-pathspecs",
+      "diff",
+      "-U0",
+      "--no-renames",
+      "--no-ext-diff",
+      "--no-color",
+      "--relative",
+      "--src-prefix=a/",
+      "--dst-prefix=b/",
+      base.out,
+      ref,
+      "--",
+      ...batch,
+    ]);
+    if (!diff.ok) return undefined;
+    for (const [path, fileHunks] of parseHunks(diff.out)) hunks.set(path, fileHunks);
+  }
+  return hunks;
+};
+
+const lineState = (hunks: Hunks | undefined, path: string, lines: LineRange): RefState => {
+  if (!hunks) return "unknown";
+  return (hunks.get(path) ?? []).some((hunk) => touches(hunk, lines)) ? "changed" : "unchanged";
+};
+
+/** Changed when anything changed; unchanged only when everything could be checked. */
+const verdict = (refs: readonly { ref: CodeRef; state: RefState }[]): Drift => {
+  const changed = refs.filter(({ state }) => state === "changed").map(({ ref }) => refText(ref));
+  if (changed.length > 0) return { state: "true", changed: [...new Set(changed)] };
+  return refs.some(({ state }) => state === "unknown") ? UNKNOWN : UNCHANGED;
+};
+
+const findDrifts = (index: StoreIndex): ReadonlyMap<Item, Drift> => {
   const items = watched(index);
   const changes = changesByRoot(items);
+  const assessed: Assessed[] = items.map(({ item, since, refs }) => ({
+    item,
+    since,
+    refs: refs.map((ref) => ({
+      ref,
+      state: fileState(changes.get(rootKey(ref.root)), ref.path, since),
+    })),
+  }));
+  const hunks = new Map([...lineChecks(assessed)].map(([key, check]) => [key, hunksSince(check)]));
   return new Map(
-    items.flatMap(({ item, since, links }) => {
-      const files = links
-        .filter(({ root, path }) => changedAfter(changes.get(rootKey(root)), path, since))
-        .map(({ path }) => path);
-      return files.length > 0 ? [[item, [...new Set(files)]]] : [];
-    }),
+    assessed.map(({ item, since, refs }) => [
+      item,
+      verdict(
+        refs.map(({ ref, state }) =>
+          state === "changed" && ref.lines
+            ? { ref, state: lineState(hunks.get(lineKey(ref.root, since)), ref.path, ref.lines) }
+            : { ref, state },
+        ),
+      ),
+    ]),
   );
 };
 
-const drifts = new WeakMap<StoreIndex, ReadonlyMap<Item, readonly string[]>>();
+const drifts = new WeakMap<StoreIndex, ReadonlyMap<Item, Drift>>();
 
 /**
- * Code files the item's own section links to that changed after its document's `checked` date.
+ * Whether code the item points at changed after its document's `checked` date.
  * Computed for the whole index on first use, so a store that never asks never runs git for it.
  */
-export const driftedFiles = (index: StoreIndex, item: Item): readonly string[] | undefined => {
+export const itemDrift = (index: StoreIndex, item: Item): Drift => {
   const known = drifts.get(index) ?? findDrifts(index);
   drifts.set(index, known);
-  return known.get(item);
+  return known.get(item) ?? UNKNOWN;
 };

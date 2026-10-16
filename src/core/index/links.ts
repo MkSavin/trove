@@ -4,6 +4,7 @@ import type { Document } from "../document/document.ts";
 import { resolveFrom } from "../edit/links.ts";
 import { gitSync } from "../git/git.ts";
 import { type Link, type Pin, pinnedRef } from "../markdown/links.ts";
+import type { LineRange } from "../text/line-range.ts";
 import type { StoreIndex } from "./index.ts";
 
 export type LinkKind = "document" | "store" | "code" | "outside";
@@ -34,6 +35,11 @@ const contains = (folder: string, path: string): boolean => {
 };
 
 export type CodeRoot = { dir: string; ref: string | undefined };
+
+/** A code file a document points at; `lines` when it names lines in it. */
+export type CodeRef = { root: CodeRoot; path: string; lines: LineRange | undefined };
+
+export const rootKey = ({ dir, ref }: CodeRoot): string => `${dir}\0${ref ?? "HEAD"}`;
 
 export const codeRoot = (index: StoreIndex, absolute: string): CodeRoot | undefined =>
   Object.values(index.config.roots)

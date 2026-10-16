@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { run } from "../src/cli/run.ts";
 import { toCsv } from "../src/core/export/csv.ts";
+import { parseHunks, touches } from "../src/core/git/hunks.ts";
 import { sshHost, webRepo } from "../src/core/git/permalink.ts";
 import { resolveLinks } from "../src/core/index/links.ts";
 import { selectItems } from "../src/core/index/query.ts";
@@ -305,69 +306,144 @@ describe("links --fix", () => {
   });
 });
 
-/** A code root committed before the web audit was checked on 2026-10-10, and `send.ts` changed after. */
-const driftedRepo = async (store: Store) => {
-  const harbor = join(store.root, "..", "harbor");
-  for (const file of ["web/src/composer/send.ts", "web/src/threads/ThreadView.tsx"]) {
-    await mkdir(dirname(join(harbor, file)), { recursive: true });
-    await Bun.write(join(harbor, file), "export {};\n");
-  }
-  const commitOn = async (date: string, message: string) => {
-    await Bun.$`git add -A`.cwd(harbor).quiet();
-    await Bun.$`git -c user.name=t -c user.email=t@t commit -qm ${message}`
-      .cwd(harbor)
-      .env({ ...process.env, GIT_COMMITTER_DATE: `${date}T12:00:00+0000` })
-      .quiet();
-  };
-  await Bun.$`git init -q`.cwd(harbor).quiet();
-  await commitOn("2026-10-01", "base");
-  await Bun.write(join(harbor, "web/src/threads/ThreadView.tsx"), "export const view = 1;\n");
-  await commitOn("2026-10-10", "same day as the check");
-  await Bun.$`git tag checked`.cwd(harbor).quiet();
-  await Bun.write(join(harbor, "web/src/composer/send.ts"), "export const retry = 1;\n");
-  await commitOn("2026-10-12", "retry sends");
+const numbered = (count: number): string[] =>
+  Array.from({ length: count }, (_, i) => `export const line${i + 1} = ${i + 1};`);
+
+const harborDir = (store: Store) => join(store.root, "..", "harbor");
+
+const writeLines = (store: Store, file: string, lines: readonly string[]) =>
+  Bun.write(join(harborDir(store), file), `${lines.join("\n")}\n`);
+
+const commitOn = async (store: Store, date: string, message: string) => {
+  const harbor = harborDir(store);
+  await Bun.$`git add -A`.cwd(harbor).quiet();
+  await Bun.$`git -c user.name=t -c user.email=t@t commit -qm ${message}`
+    .cwd(harbor)
+    .env({ ...process.env, GIT_COMMITTER_DATE: `${date}T12:00:00+0000` })
+    .quiet();
 };
 
+const SEND = "web/src/composer/send.ts";
+const VIEW = "web/src/threads/ThreadView.tsx";
+
+/**
+ * A code root committed before the web audit was checked on 2026-10-10. After the check,
+ * `send.ts` changed inside the lines WEB1-1 names and `ThreadView.tsx` only outside WEB1-2's line.
+ */
+const driftedRepo = async (store: Store) => {
+  const harbor = harborDir(store);
+  for (const file of [SEND, VIEW, "web/src/a/index.ts", "web/src/b/index.ts"]) {
+    await mkdir(dirname(join(harbor, file)), { recursive: true });
+  }
+  await Bun.$`git init -q`.cwd(harbor).quiet();
+  await writeLines(store, SEND, numbered(80));
+  await writeLines(store, VIEW, numbered(100));
+  await writeLines(store, "web/src/a/index.ts", []);
+  await writeLines(store, "web/src/b/index.ts", []);
+  await commitOn(store, "2026-10-01", "base");
+
+  const view = numbered(100);
+  view[87] = "export const line88 = 'same day as the check';";
+  await writeLines(store, VIEW, view);
+  await commitOn(store, "2026-10-10", "same day as the check");
+  await Bun.$`git tag checked`.cwd(harbor).quiet();
+
+  const send = numbered(80);
+  send[49] = "export const retry = 1;";
+  await writeLines(store, SEND, [...numbered(10), ...send]);
+  view[91] = "export const line92 = 'moved';";
+  await writeLines(store, VIEW, ["// a", "// b", "// c", ...view]);
+  await commitOn(store, "2026-10-12", "retry sends");
+  return view;
+};
+
+const driftOf = (store: Store, ids: readonly string[]) =>
+  queryRows(store.index, "items", { id: [...ids] }, ["id", "drift"]).rows;
+
 describe("drift", () => {
-  test("an item drifts when code its section links to changed after the check", async () => {
+  test("an item drifts when lines its section links to changed after the check", async () => {
     const store = await sandbox();
-    await driftedRepo(store);
+    const view = await driftedRepo(store);
     const drifted = selectItems(store.index, { drift: ["true"] }).map((item) => item.id);
     expect(drifted).toEqual(["WEB1-1"]);
-    const rows = queryRows(store.index, "items", { id: ["WEB1-1", "WEB1-2", "WEB1-4"] }, [
-      "id",
-      "drift",
-    ]).rows;
-    expect(rows).toEqual([
+    expect(driftOf(store, ["WEB1-1", "WEB1-2", "WEB1-4", "WEB1-7"])).toEqual([
       { id: "WEB1-1", drift: "true" },
       { id: "WEB1-2", drift: "false" },
       { id: "WEB1-4", drift: "false" },
+      { id: "WEB1-7", drift: "unknown" },
     ]);
 
     const io = captureIo(store.root);
     const args = ["query", "items", "drift=true", "--columns", "id,drift"];
     expect(await run([...args, "--store", store.root], io)).toBe(0);
     expect(io.stdout()).toMatch(/WEB1-1\s+true/);
+
+    view[87] = "export const line88 = 'virtualized';";
+    await writeLines(store, VIEW, ["// a", "// b", "// c", ...view]);
+    await commitOn(store, "2026-10-13", "virtualize the thread");
+    expect(driftOf(await reopen(store), ["WEB1-2"])).toEqual([{ id: "WEB1-2", drift: "true" }]);
   });
 
-  test("a block cell names the changed files", async () => {
+  test("a block cell names the changed lines, `—` when unchanged and `?` when unchecked", async () => {
     const store = await sandbox();
     await driftedRepo(store);
     const context = { index: store.index, rel: "NOTES.md", base: {} };
-    expect(renderView("items", { id: "WEB1-1,WEB1-2", columns: "id,drift" }, context)).toBe(
+    expect(renderView("items", { id: "WEB1-1,WEB1-2,WEB1-7", columns: "id,drift" }, context)).toBe(
       [
         "| id | drift |",
         "| -- | ----- |",
-        "| WEB1-1 | web/src/composer/send.ts |",
+        `| WEB1-1 | ${SEND}:41-63 |`,
         "| WEB1-2 | — |",
+        "| WEB1-7 | ? |",
       ].join("\n"),
     );
+  });
+
+  test("file names in inline code count when one tracked file matches", async () => {
+    const store = await sandbox();
+    await driftedRepo(store);
+    const audit = join(store.root, "audits/AUDIT_WEB_1.md");
+    const text = await Bun.file(audit).text();
+    await Bun.write(
+      audit,
+      text
+        .replace("while it is encoded |", "while it is encoded in `send.ts:50` |")
+        .replace("Encoding runs on the main thread;", "Encoding in `composer/send.ts:1-5` runs;")
+        .replace("Add `aria-label`", "Add `aria-label` in `index.ts`"),
+    );
+    const reopened = await reopen(store);
+    expect(driftOf(reopened, ["WEB1-7", "WEB1-8"])).toEqual([
+      { id: "WEB1-7", drift: "true" },
+      { id: "WEB1-8", drift: "unknown" },
+    ]);
+    const context = { index: reopened.index, rel: "NOTES.md", base: {} };
+    expect(renderView("items", { id: "WEB1-7", columns: "drift" }, context)).toContain(
+      `| ${SEND}:50 |`,
+    );
+  });
+
+  test("is unknown when the root is missing or its ref is unknown", async () => {
+    const store = await sandbox();
+    expect(driftOf(store, ["WEB1-1", "WEB1-4"])).toEqual([
+      { id: "WEB1-1", drift: "unknown" },
+      { id: "WEB1-4", drift: "unknown" },
+    ]);
+
+    await driftedRepo(store);
+    const config = join(store.root, "trove.yaml");
+    const text = await Bun.file(config).text();
+    await Bun.write(
+      config,
+      text.replace("harbor: ../harbor", "harbor: { path: ../harbor, ref: nowhere }"),
+    );
+    const reopened = await reopen(store);
+    expect(selectItems(reopened.index, { drift: ["true", "false"] })).toEqual([]);
   });
 
   test("a root with a ref reads changes at that ref, not in the checkout", async () => {
     const store = await sandbox();
     await driftedRepo(store);
-    const harbor = join(store.root, "..", "harbor");
+    const harbor = harborDir(store);
     await Bun.$`git branch -q tip`.cwd(harbor).quiet();
     await Bun.$`git checkout -q checked`.cwd(harbor).quiet();
     expect(selectItems(store.index, { drift: ["true"] })).toEqual([]);
@@ -381,6 +457,37 @@ describe("drift", () => {
     const reopened = await reopen(store);
     const drifted = selectItems(reopened.index, { drift: ["true"] }).map((item) => item.id);
     expect(drifted).toEqual(["WEB1-1"]);
+  });
+
+  test("diff hunks touch a line range by their old-side lines", () => {
+    const hunks = parseHunks(
+      [
+        "diff --git a/src/my file.ts b/src/my file.ts",
+        "--- a/src/my file.ts",
+        "+++ b/src/my file.ts",
+        "@@ -0,0 +1,3 @@",
+        "@@ -12,2 +15,2 @@",
+        "@@ -40 +43 @@",
+        "--- /dev/null",
+        "diff --git a/new.ts b/new.ts",
+        "new file mode 100644",
+        "--- /dev/null",
+        "+++ b/new.ts",
+        "@@ -0,0 +1 @@",
+      ].join("\n"),
+    );
+    const mine = hunks.get("src/my file.ts") ?? [];
+    expect(mine).toHaveLength(3);
+    const hit = (from: number, to: number) => mine.some((hunk) => touches(hunk, { from, to }));
+    expect(hit(1, 10)).toBe(false);
+    expect(hit(13, 13)).toBe(true);
+    expect(hit(14, 39)).toBe(false);
+    expect(hit(40, 40)).toBe(true);
+    expect(touches({ start: 20, count: 0 }, { from: 20, to: 21 })).toBe(true);
+    expect(touches({ start: 21, count: 0 }, { from: 20, to: 21 })).toBe(false);
+    expect((hunks.get("new.ts") ?? []).some((hunk) => touches(hunk, { from: 9, to: 9 }))).toBe(
+      true,
+    );
   });
 });
 

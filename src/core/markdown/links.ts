@@ -3,6 +3,8 @@ import type { Line } from "../text/lines.ts";
 export type Link = {
   /** Relative target without its `#anchor`. */
   path: string;
+  /** The `#…` part without the `#`, e.g. `L12-L40`. */
+  anchor: string | undefined;
   line: number;
   /** Source offsets of `path`, for rewriting it in place. */
   start: number;
@@ -55,6 +57,7 @@ export const findLinks = (lines: readonly Line[], fenced: ReadonlySet<number>): 
         return [
           {
             path,
+            anchor: match[2]?.slice(1),
             line: line.number,
             start: line.start + at[0],
             end: line.start + at[1],

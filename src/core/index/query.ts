@@ -3,7 +3,7 @@ import { staleDays } from "../document/freshness.ts";
 import type { Item } from "../document/ledger.ts";
 import { nextStage, progressBar, stageProgress } from "../document/progress.ts";
 import { lastVerified } from "../verify/last.ts";
-import { driftedFiles } from "./drift.ts";
+import { itemDrift } from "./drift.ts";
 import type { StoreIndex } from "./index.ts";
 import { fieldMatches } from "./match.ts";
 import { pendingRefs } from "./waiting.ts";
@@ -60,7 +60,7 @@ export const itemField = (item: Item, field: string, index: StoreIndex): string 
   if (field === WAITING) {
     return String(pendingRefs(index, itemField(item, "blocked_by", index)).length > 0);
   }
-  if (field === DRIFT) return String(driftedFiles(index, item) !== undefined);
+  if (field === DRIFT) return itemDrift(index, item).state;
   if (Object.hasOwn(item.values, field)) return item.values[field];
   const doc = index.byRel.get(item.document);
   return doc ? documentField(doc, field, index) : undefined;
