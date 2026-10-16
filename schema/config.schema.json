@@ -1,0 +1,971 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/MkSavin/trove/main/schema/config.schema.json",
+  "title": "trove store config",
+  "type": "object",
+  "properties": {
+    "regulation": {
+      "type": "number",
+      "const": 1
+    },
+    "language": {
+      "default": "en",
+      "type": "string"
+    },
+    "sync": {
+      "default": "off",
+      "type": "string",
+      "enum": [
+        "off",
+        "commit",
+        "push"
+      ]
+    },
+    "roots": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "ref": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "folders": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "types": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "prefix",
+          "types"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "archive": {
+      "default": {
+        "folder": ".archive",
+        "status": "archived",
+        "finished": []
+      },
+      "type": "object",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "finished": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "ignore": {
+      "default": [
+        "AGENTS.md",
+        "README.md"
+      ],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "regulationFiles": {
+      "default": [
+        "AGENTS.md"
+      ],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "statuses": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "labels": {
+      "default": {
+        "statusLine": "Status",
+        "checked": "Checked",
+        "ledger": "Ledger",
+        "closedLedger": "Closed items",
+        "count": "count",
+        "summaryCounts": "By priority",
+        "summaryItems": "Open items",
+        "summaryDocuments": "Documents in work",
+        "branch": "branch",
+        "lastCommit": "last commit",
+        "ownCommits": "own",
+        "localAhead": "local ahead",
+        "localDiverged": "local diverged",
+        "change": "change",
+        "changeClosed": "closed",
+        "changeAdded": "added",
+        "changeMoved": "moved"
+      },
+      "type": "object",
+      "properties": {
+        "statusLine": {
+          "default": "Status",
+          "type": "string"
+        },
+        "checked": {
+          "default": "Checked",
+          "type": "string"
+        },
+        "ledger": {
+          "default": "Ledger",
+          "type": "string"
+        },
+        "closedLedger": {
+          "default": "Closed items",
+          "type": "string"
+        },
+        "count": {
+          "default": "count",
+          "type": "string"
+        },
+        "summaryCounts": {
+          "default": "By priority",
+          "type": "string"
+        },
+        "summaryItems": {
+          "default": "Open items",
+          "type": "string"
+        },
+        "summaryDocuments": {
+          "default": "Documents in work",
+          "type": "string"
+        },
+        "branch": {
+          "default": "branch",
+          "type": "string"
+        },
+        "lastCommit": {
+          "default": "last commit",
+          "type": "string"
+        },
+        "ownCommits": {
+          "default": "own",
+          "type": "string"
+        },
+        "localAhead": {
+          "default": "local ahead",
+          "type": "string"
+        },
+        "localDiverged": {
+          "default": "local diverged",
+          "type": "string"
+        },
+        "change": {
+          "default": "change",
+          "type": "string"
+        },
+        "changeClosed": {
+          "default": "closed",
+          "type": "string"
+        },
+        "changeAdded": {
+          "default": "added",
+          "type": "string"
+        },
+        "changeMoved": {
+          "default": "moved",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "fields": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "required",
+              "optional"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "required": {
+                "default": false,
+                "type": "boolean"
+              },
+              "format": {
+                "default": "text",
+                "type": "string",
+                "enum": [
+                  "text",
+                  "date",
+                  "refs"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "types": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string"
+          },
+          "capabilities": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ledger",
+                "series",
+                "versions",
+                "prompt-body",
+                "resolved-of",
+                "status-line",
+                "freshness",
+                "generated",
+                "stages"
+              ]
+            }
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "initial": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "required",
+                    "optional"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "required": {
+                      "default": false,
+                      "type": "boolean"
+                    },
+                    "format": {
+                      "default": "text",
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "date",
+                        "refs"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "freshness": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "ledger": {
+            "type": "object",
+            "properties": {
+              "marker": {
+                "default": "ledger",
+                "type": "string"
+              },
+              "id": {
+                "default": "{slug}-{n}",
+                "type": "string"
+              },
+              "sections": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "columns": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "required": {
+                      "default": false,
+                      "type": "boolean"
+                    },
+                    "enum": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "open": {
+                "default": [
+                  "open"
+                ],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "closed": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              },
+              "note": {
+                "default": "{status}, {commit}",
+                "type": "string"
+              },
+              "heading": {
+                "default": "{id}. {what} ({status})",
+                "type": "string"
+              },
+              "stub": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "columns"
+            ],
+            "additionalProperties": false
+          },
+          "closeInto": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ledger": {
+      "type": "object",
+      "properties": {
+        "marker": {
+          "default": "ledger",
+          "type": "string"
+        },
+        "id": {
+          "default": "{slug}-{n}",
+          "type": "string"
+        },
+        "sections": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "columns": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "required": {
+                "default": false,
+                "type": "boolean"
+              },
+              "enum": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "label"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "open": {
+          "default": [
+            "open"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "closed": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "note": {
+          "default": "{status}, {commit}",
+          "type": "string"
+        },
+        "heading": {
+          "default": "{id}. {what} ({status})",
+          "type": "string"
+        },
+        "stub": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "additionalProperties": false
+    },
+    "lifecycle": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "when": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "no-open-items",
+                    "has-open-items"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "place": {
+              "type": "string",
+              "enum": [
+                "archive",
+                "work"
+              ]
+            }
+          },
+          "required": [
+            "when",
+            "place"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "freshness": {
+      "default": {
+        "default": 60
+      },
+      "type": "object",
+      "properties": {
+        "default": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "default"
+      ],
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "error",
+              "warn",
+              "info",
+              "off"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "level": {
+                "type": "string",
+                "enum": [
+                  "error",
+                  "warn",
+                  "info",
+                  "off"
+                ]
+              },
+              "since": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "limit": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "level"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "reports": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "output": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "intro": {
+            "type": "string"
+          },
+          "sections": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string",
+                  "enum": [
+                    "items",
+                    "documents"
+                  ]
+                },
+                "where": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "groupBy": {
+                  "type": "string"
+                },
+                "groupOrder": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "sort": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "count": {
+                  "type": "string"
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "empty": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "key"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "from"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "output",
+          "type",
+          "status",
+          "title",
+          "scope",
+          "note",
+          "sections"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "plugins": {
+      "type": "string"
+    },
+    "templates": {
+      "type": "string"
+    },
+    "summaries": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "default": "summary",
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "filter": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "template": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "stages": {
+      "default": {
+        "status": [
+          "status",
+          "state",
+          "статус",
+          "состояние"
+        ],
+        "done": [
+          "done",
+          "merged",
+          "closed",
+          "complete",
+          "completed",
+          "finished",
+          "shipped",
+          "released",
+          "✓",
+          "✔",
+          "✅",
+          "готов",
+          "готово",
+          "сделан",
+          "сделано",
+          "выполнен",
+          "выполнено",
+          "реализован",
+          "реализовано",
+          "завершён",
+          "завершен",
+          "завершено",
+          "влит",
+          "влито",
+          "слит",
+          "слито",
+          "в master",
+          "в main",
+          "закрыт",
+          "закрыто"
+        ]
+      },
+      "type": "object",
+      "properties": {
+        "status": {
+          "default": [
+            "status",
+            "state",
+            "статус",
+            "состояние"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "done": {
+          "default": [
+            "done",
+            "merged",
+            "closed",
+            "complete",
+            "completed",
+            "finished",
+            "shipped",
+            "released",
+            "✓",
+            "✔",
+            "✅",
+            "готов",
+            "готово",
+            "сделан",
+            "сделано",
+            "выполнен",
+            "выполнено",
+            "реализован",
+            "реализовано",
+            "завершён",
+            "завершен",
+            "завершено",
+            "влит",
+            "влито",
+            "слит",
+            "слито",
+            "в master",
+            "в main",
+            "закрыт",
+            "закрыто"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "regulation",
+    "statuses",
+    "types"
+  ],
+  "additionalProperties": false
+}

@@ -1,4 +1,5 @@
 import { basename, relative, resolve } from "node:path";
+import { withSchemaModeline } from "../config/json-schema.ts";
 import { TroveError } from "../errors.ts";
 import { git, gitOrThrow, toplevel } from "../git/git.ts";
 import { type Language, presetConfig } from "../presets/presets.ts";
@@ -71,10 +72,8 @@ export const initStore = async (options: InitOptions): Promise<InitResult> => {
   const projectName = basename(project);
   const root = resolve(project, options.path ?? `../${projectName}-trove`);
   const projectPath = toPosix(relative(root, project));
-  const configText = withProjectRoot(
-    presetConfig(options.language),
-    projectName,
-    projectPath,
+  const configText = withSchemaModeline(
+    withProjectRoot(presetConfig(options.language), projectName, projectPath),
   ).replace(/^sync: off$/m, `sync: ${options.remote ? "push" : "off"}`);
   await writeScaffold(root, { project: projectName, projectPath, configText });
 

@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { cp, mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { SCHEMA_MODELINE } from "../src/core/config/json-schema.ts";
 import { git, toplevel } from "../src/core/git/git.ts";
 import { cloneStore, cloneStores } from "../src/core/store/clone.ts";
 import { diagnose } from "../src/core/store/doctor.ts";
@@ -69,7 +70,9 @@ describe("init", () => {
     const app = await project("app");
     const result = await initStore({ cwd: app, language: "ru", git: false, path: "../notes" });
     expect(existsSync(join(result.store, ".git"))).toBe(false);
-    expect(await Bun.file(join(result.store, "trove.yaml")).text()).toContain("language: ru");
+    const config = await Bun.file(join(result.store, "trove.yaml")).text();
+    expect(config).toContain("language: ru");
+    expect(config).toStartWith(`${SCHEMA_MODELINE}\n`);
     await expect(initStore({ cwd: app, language: "en" })).rejects.toThrow(
       /already has .*trove\.yaml/,
     );

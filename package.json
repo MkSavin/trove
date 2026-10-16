@@ -26,6 +26,7 @@
     "verify": "bun run lint && bun run typecheck && bun test",
     "e2e": "bun scripts/e2e.ts",
     "build": "bun scripts/build.ts",
+    "schema": "bun src/cli/main.ts schema > schema/config.schema.json",
     "release:version": "changeset version && bun scripts/sync-version.ts",
     "prepare": "lefthook install"
   },

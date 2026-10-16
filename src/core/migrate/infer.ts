@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { withSchemaModeline } from "../config/json-schema.ts";
 import { CONFIG_FILE, parseConfig } from "../config/load.ts";
 import type { ConfigInput } from "../config/schema.ts";
 import { keyOf } from "../config/vocabulary.ts";
@@ -110,7 +111,7 @@ export const inferConfig = async (
     root,
     index,
   );
-  const text = `${HEADER}${Bun.YAML.stringify(config, null, 2)}\n`;
+  const text = withSchemaModeline(`${HEADER}${Bun.YAML.stringify(config, null, 2)}\n`);
   parseConfig(text, CONFIG_FILE);
   return { language: chosen, text, notes };
 };

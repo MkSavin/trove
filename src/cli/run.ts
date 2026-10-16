@@ -22,6 +22,8 @@ import { remote } from "./commands/remote.ts";
 import { report } from "./commands/report.ts";
 import { resync } from "./commands/resync.ts";
 import { rules } from "./commands/rules.ts";
+import { schema } from "./commands/schema.ts";
+import { serve } from "./commands/serve.ts";
 import { show } from "./commands/show.ts";
 import { store } from "./commands/store.ts";
 import { summary } from "./commands/summary.ts";
@@ -48,6 +50,7 @@ const COMMANDS: readonly Command[] = [
   prompt,
   links,
   exportCommand,
+  serve,
   doc,
   item,
   sync,
@@ -55,6 +58,7 @@ const COMMANDS: readonly Command[] = [
   hook,
   regulationCommand,
   rules,
+  schema,
 ];
 
 const GLOBAL_FLAGS = [

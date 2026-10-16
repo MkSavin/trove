@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!test/fixtures", "!sandbox"]
+    "includes": ["**", "!test/fixtures", "!sandbox", "!schema"]
   },
   "formatter": {
     "enabled": true,
