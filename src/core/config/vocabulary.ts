@@ -63,3 +63,11 @@ export const allLedgers = (config: Config): LedgerConfig[] => [
   ...(config.ledger ? [config.ledger] : []),
   ...Object.values(config.types).flatMap((type) => (type.ledger ? [type.ledger] : [])),
 ];
+
+/** Statuses a document of the type keeps in the archive: the archive's own, and those `lifecycle` sends there. */
+export const archivedStatuses = (config: Config, type: string | undefined): string[] => {
+  const sent = (type === undefined ? [] : (config.lifecycle[type] ?? [])).flatMap((step) =>
+    step.place === "archive" && typeof step.when === "object" ? [step.when.status] : [],
+  );
+  return [config.archive.status, ...config.archive.finished, ...sent];
+};

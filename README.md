@@ -80,7 +80,7 @@ A teammate runs `trove clone <store-url>` in their clone of the project: the sto
 | command | does |
 | ------- | ---- |
 | `trove doc new <type> <topic> [--scope] [--field k=v]` | A document from the type's template: folder, prefix, next series number, slug. The name is the topic's first eight words in capitals, Cyrillic transliterated (`чего не хватает` → `CHEGO_NE_KHVATAET`); other scripts need `--name`. |
-| `trove doc archive <doc>` | Move into the archive mirror, set the status, fix relative links on both sides. |
+| `trove doc archive <doc> [--status closed]` | Move into the archive mirror, set the status, fix relative links on both sides. A status that `lifecycle` archives the type under, such as a closed plan's, is kept; `--status` sets one in the same step. |
 | `trove doc retype <doc> <type>` | Turn a document into another type, e.g. research that became a plan of work: folder, prefix, status, title, links and references follow. |
 | `trove summary new <kind> [filters] [--name]` | A dated summary document of that kind: its generated blocks filled, `<!-- write: … -->` places left for the analysis. |
 | `trove doc checked <doc>` · `trove doc set <doc> <field> <value>` | Re-checked today · any header field; `status` also updates the status line. |
@@ -233,7 +233,7 @@ A template is the body after the status line: Markdown, generated blocks and wri
 | `known-type` | error | the type is declared |
 | `known-status` | error | the status is declared |
 | `type-status` | error | the status is one the type allows |
-| `archive-status` | error | archived status if and only if the file is in the archive folder |
+| `archive-status` | error | archived status if and only if the file is in the archive folder; a status `lifecycle` sends to the archive, or one in `archive.finished`, counts as archived there |
 | `lifecycle` | error | the document sits where `lifecycle` says it should |
 | `status-line` | error | the status line matches the header |
 | `ledger-block` | error | ledger types have one closed ledger block |

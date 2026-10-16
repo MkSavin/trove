@@ -123,22 +123,23 @@ export const registerEditTools = (server: McpServer, context: Context): void => 
     "trove_transition",
     {
       description:
-        "Move a document along its lifecycle. to=archive moves it into the archive mirror, sets its status and fixes links; to=type with type turns it into another type (e.g. research that became a plan of work, see trove_regulation placement). A refusal lists what is still missing.",
+        "Move a document along its lifecycle. to=archive moves it into the archive mirror, sets its status (status, e.g. closed, when its lifecycle archives it under that status) and fixes links; to=type with type turns it into another type (e.g. research that became a plan of work, see trove_regulation placement). A refusal lists what is still missing.",
       inputSchema: z.object({
         store: storeField,
         document: z.string(),
         to: z.enum(["archive", "type"]),
         type: z.string().optional().describe("The new type, for to=type"),
+        status: z.string().optional().describe("The status it is archived with, for to=archive"),
         dryRun: dryRunField,
       }),
       annotations: EDIT,
     },
-    guarded(async ({ store, document, to, type, dryRun }) => {
+    guarded(async ({ store, document, to, type, status, dryRun }) => {
       const opened = await openFor(context, store);
       const doc = requireDocument(opened.index, document);
       const plan =
         to === "archive"
-          ? archivePlan(opened.index, doc)
+          ? archivePlan(opened.index, doc, status)
           : retypePlan(opened.index, doc, required(type, "type"));
       return runPlanTool(opened, plan, dryRun);
     }),

@@ -1,5 +1,5 @@
 import type { LifecycleStep } from "../../config/schema.ts";
-import { labelOf } from "../../config/vocabulary.ts";
+import { archivedStatuses, labelOf } from "../../config/vocabulary.ts";
 import type { Document } from "../../document/document.ts";
 import { defineRule, type RuleContext } from "../rule.ts";
 
@@ -10,10 +10,13 @@ export const archiveStatus = defineRule({
   scope: "document",
   check: (doc, { config }) => {
     const { folder, status, finished } = config.archive;
-    const archived = doc.status !== undefined && [status, ...finished].includes(doc.status);
-    if (doc.place === "archive" && !archived) {
+    const kept =
+      doc.status !== undefined && archivedStatuses(config, doc.type).includes(doc.status);
+    if (doc.place === "archive" && !kept) {
       return [{ line: 1, message: `in ${folder}/ but status is ${doc.meta.status ?? "missing"}` }];
     }
+    // A status that lifecycle sends to the archive is reported by lifecycle while still in work.
+    const archived = doc.status !== undefined && [status, ...finished].includes(doc.status);
     if (doc.place === "work" && archived) {
       const label = labelOf(config.statuses, doc.status ?? "");
       return [{ line: 1, message: `status ${label} outside ${folder}/` }];

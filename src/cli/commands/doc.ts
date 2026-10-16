@@ -41,13 +41,13 @@ const docNew: Command = {
 const docArchive: Command = {
   name: "archive",
   summary: "Move a document into the archive and fix links to it",
-  usage: "trove doc archive <document> [--dry-run]",
+  usage: "trove doc archive <document> [--status STATUS] [--dry-run]",
   run: async (argv, io) => {
-    const { values, positionals } = parse(argv, OP_OPTIONS);
+    const { values, positionals } = parse(argv, { ...OP_OPTIONS, status: { type: "string" } });
     const [name] = positionals;
     if (!name) throw new TroveError("doc archive needs a document");
     const store = await openFromFlags(values, io);
-    const plan = archivePlan(store.index, requireDocument(store.index, name));
+    const plan = archivePlan(store.index, requireDocument(store.index, name), values.status);
     return runPlan(store, plan, io, values["dry-run"]);
   },
 };

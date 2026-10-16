@@ -3,6 +3,7 @@ import { cp, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyPlan } from "../src/core/ops/apply.ts";
+import { archivePlan } from "../src/core/ops/doc-archive.ts";
 import { retypePlan } from "../src/core/ops/doc-retype.ts";
 import { requireDocument } from "../src/core/ops/find.ts";
 import { regulation } from "../src/core/regulation/regulation.ts";
@@ -123,5 +124,40 @@ describe("doc retype", () => {
     const doc = requireDocument(store.index, "PLAN_OFFLINE_MODE");
     expect(() => retypePlan(store.index, doc, "plan")).toThrow(/already plan/);
     expect(() => retypePlan(store.index, doc, "memo")).toThrow(/unknown type/);
+  });
+
+  test("a closed plan goes to the archive as closed, which the archive accepts", async () => {
+    const store = await sandbox();
+    const rel = "plans/PLAN_PUSH_RETRY.md";
+    const text = (await read(store, rel))
+      .replace("status: in progress", "status: closed")
+      .replace("**Status:** in progress.", "**Status:** closed.");
+    await Bun.write(join(store.root, rel), text);
+    const closed = await openStore({ cwd: store.root, store: store.root, today: TODAY });
+    const rules = (s: Store) =>
+      runRules(s.rules, s.index)
+        .filter((d) => d.file.endsWith("PLAN_PUSH_RETRY.md"))
+        .map((d) => d.rule);
+    expect(rules(closed)).toEqual(["lifecycle"]);
+
+    const plan = archivePlan(closed.index, requireDocument(closed.index, "PLAN_PUSH_RETRY"));
+    expect((await applyPlan(closed, plan)).introduced).toEqual([]);
+    const archived = await openStore({ cwd: store.root, store: store.root, today: TODAY });
+    expect(rules(archived)).toEqual([]);
+    expect(await read(store, ".archive/plans/PLAN_PUSH_RETRY.md")).toContain("status: closed\n");
+  });
+
+  test("doc archive --status closes and archives in one step", async () => {
+    const store = await sandbox();
+    const doc = requireDocument(store.index, "PLAN_OFFLINE_MODE");
+    expect(() => archivePlan(store.index, doc, "open")).toThrow(
+      /plan goes to the archive as archived, closed/,
+    );
+    expect((await applyPlan(store, archivePlan(store.index, doc, "closed"))).introduced).toEqual(
+      [],
+    );
+    const text = await read(store, ".archive/plans/PLAN_OFFLINE_MODE.md");
+    expect(text).toContain("status: closed\n");
+    expect(text).toContain("**Status:** closed.");
   });
 });
