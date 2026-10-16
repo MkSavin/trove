@@ -4,7 +4,7 @@ status: in progress
 date: 2026-10-09
 checked: 2026-10-13
 scope: "api/realtime, infra/load-balancer"
-verify: step 2: the reconnect histogram in the API dashboard covers all regions
+verify: "step 2: the reconnect histogram in the API dashboard covers all regions"
 ---
 
 # STUDY_RECONNECT_STORMS — why clients reconnect in waves after a deploy

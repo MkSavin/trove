@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { frontMatterYaml } from "../src/core/rules/builtin/front-matter.ts";
 import { defineRule, indexDocuments, parseDocument, runRules, type Store } from "../src/index.ts";
 import { openFixture, TODAY } from "./helpers.ts";
 
@@ -93,5 +94,18 @@ describe("custom rules", () => {
     );
     const index = indexDocuments(store.root, store.config, [doc], TODAY);
     expect(runRules([noTodo], index)).toMatchObject([{ rule: "no-todo", file: "x.md" }]);
+  });
+});
+
+describe("front-matter-yaml", () => {
+  const check = (header: string) => {
+    const text = `---\ntype: plan\n${header}\n---\n# X\n`;
+    const doc = parseDocument({ path: "x.md", rel: "x.md", text }, store.config);
+    return runRules([frontMatterYaml], indexDocuments(store.root, store.config, [doc], TODAY));
+  };
+
+  test("points at the field whose value needs quotes", () => {
+    expect(check("verify: step 2: a test exists")).toMatchObject([{ line: 3, severity: "warn" }]);
+    expect(check('verify: "step 2: a test exists"')).toEqual([]);
   });
 });

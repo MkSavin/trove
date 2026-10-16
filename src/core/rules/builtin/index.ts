@@ -3,7 +3,7 @@ import { duplicateSuspect } from "./duplicates.ts";
 import { fieldFormat, requiredField, unknownField } from "./fields.ts";
 import { folderType } from "./folders.ts";
 import { stale } from "./freshness.ts";
-import { frontMatter } from "./front-matter.ts";
+import { frontMatter, frontMatterYaml } from "./front-matter.ts";
 import {
   duplicateId,
   idFormat,
@@ -26,6 +26,7 @@ import { deferralLifted, waitRefs } from "./waiting.ts";
 
 export const builtinRules: readonly Rule[] = [
   frontMatter,
+  frontMatterYaml,
   requiredField,
   fieldFormat,
   unknownField,

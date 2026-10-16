@@ -4,7 +4,7 @@ status: in progress
 date: 2026-09-20
 checked: 2026-10-08
 scope: "api/presence, web/src/presence, mobile/"
-verify: stage 2: `presence.v2` topic exists in `api/presence/hub.go`
+verify: "stage 2: `presence.v2` topic exists in `api/presence/hub.go`"
 verify-cmd: git -C {root:harbor} grep -q presence.v2 -- api/presence/hub.go
 ---
 
