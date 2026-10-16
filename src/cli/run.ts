@@ -16,6 +16,7 @@ import { mcp } from "./commands/mcp.ts";
 import { migrate } from "./commands/migrate.ts";
 import { prompt } from "./commands/prompt.ts";
 import { query } from "./commands/query.ts";
+import { refresh } from "./commands/refresh.ts";
 import { regulationCommand } from "./commands/regulation.ts";
 import { remote } from "./commands/remote.ts";
 import { report } from "./commands/report.ts";
@@ -40,6 +41,7 @@ const COMMANDS: readonly Command[] = [
   forget,
   check,
   report,
+  refresh,
   query,
   summary,
   show,

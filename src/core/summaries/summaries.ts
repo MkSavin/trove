@@ -17,6 +17,7 @@ import type { Plan } from "../ops/plan.ts";
 import { thenPlan } from "../ops/with-changes.ts";
 import { refreshGenerated } from "../reports/embeds.ts";
 import { compareText } from "../text/compare.ts";
+import { carryWritten } from "./carry.ts";
 import { defaultBody, loadBody, renderDraft } from "./template.ts";
 
 const LATEST = "latest";
@@ -78,11 +79,10 @@ const writtenBody = (doc: Document): string => {
 const draftText = async (index: StoreIndex, request: SummaryRequest): Promise<string> => {
   const kind = kindOf(index, request.kind);
   const from = source(index, request);
-  const body = from
-    ? writtenBody(from)
-    : request.kind
-      ? await loadBody(index.root, index.config, kind)
-      : defaultBody(index.config);
+  const template = request.kind
+    ? await loadBody(index.root, index.config, kind)
+    : defaultBody(index.config);
+  const body = from ? carryWritten(template, writtenBody(from)) : template;
   const title = request.title ?? kind.title;
   return renderDraft(index.config, {
     kind: request.kind ?? "adhoc",

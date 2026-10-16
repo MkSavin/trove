@@ -30,6 +30,17 @@ describe("selectItems", () => {
 });
 
 describe("queryRows", () => {
+  test("documents fill a document column with their path", () => {
+    const plans = queryRows(store.index, "documents", { type: ["plan"], place: ["work"] }, [
+      "document",
+      "status",
+    ]);
+    expect(plans.rows.map((row) => row.document)).toEqual([
+      "plans/PLAN_OFFLINE_MODE.md",
+      "plans/PLAN_PUSH_RETRY.md",
+    ]);
+  });
+
   test("shows only the columns of the ledgers the matched items come from", () => {
     const audits = queryRows(store.index, "items", { type: ["audit"] });
     expect(audits.fields).toEqual([

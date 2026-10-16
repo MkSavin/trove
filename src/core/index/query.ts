@@ -26,6 +26,7 @@ export const documentField = (
 ): string | undefined => {
   switch (field) {
     case "path":
+    case "document":
       return doc.rel;
     case "name":
       return doc.name;

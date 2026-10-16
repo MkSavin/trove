@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { parseFilters } from "../src/cli/args.ts";
 import { fieldMatches } from "../src/core/index/match.ts";
 import { queryRows } from "../src/core/index/rows.ts";
+import { refreshPlan } from "../src/core/ops/refresh.ts";
+import { carryWritten } from "../src/core/summaries/carry.ts";
 import { newSummary, showSummary } from "../src/core/summaries/summaries.ts";
 import { openStore, parseConfig } from "../src/index.ts";
 import { ROOT, TODAY } from "./helpers.ts";
@@ -131,5 +133,66 @@ describe("summaries", () => {
     expect(() =>
       parseConfig(`${base}types: { note: {} }\nsummaries: { x: { title: X } }`, "inline"),
     ).toThrow(/summaries\.x\.type/);
+  });
+});
+
+describe("refresh", () => {
+  test("refills a named summary even past its date, never an archived document", async () => {
+    const later = await openStore({ cwd: SANDBOX, store: SANDBOX, today: "2099-01-01" });
+    const summary = later.index.byName.get("SUMMARY_WEB.md");
+    if (!summary) throw new Error("the sandbox has a web summary");
+    const broken = { ...summary, text: summary.text.replace("| WEB1-1 |", "| WEB1-0 |") };
+    const plan = await refreshPlan(later.index, [broken]);
+    expect(plan.changes.map((change) => change.rel)).toEqual(["summaries/SUMMARY_WEB.md"]);
+    expect(plan.changes[0]?.text).toContain("| WEB1-1 |");
+    expect((await refreshPlan(later.index, [])).changes).toEqual([]);
+
+    const archived = later.index.documents.find((doc) => doc.place === "archive");
+    if (!archived) throw new Error("the sandbox has an archive");
+    await expect(refreshPlan(later.index, [archived])).rejects.toThrow(/is archived/);
+  });
+});
+
+describe("carrying a summary over", () => {
+  test("the template keeps its structure; written places come from the previous summary", () => {
+    const template = [
+      "<!-- write: intro -->",
+      "",
+      "## Counts",
+      "",
+      "<!-- trove:counts by=priority -->",
+      "<!-- /trove:counts -->",
+      "",
+      "<!-- write: what to look at first -->",
+      "",
+      "## New section",
+      "",
+      "<!-- trove:items status=deferred -->",
+      "<!-- /trove:items -->",
+      "",
+      "<!-- write: not verified yet -->",
+    ].join("\n");
+    const previous = [
+      "The intro as written.",
+      "",
+      "## Counts",
+      "",
+      "<!-- trove:counts by=priority -->",
+      "| P | count |",
+      "<!-- /trove:counts -->",
+      "",
+      "Look at API2-1 first.",
+      "",
+      "## Old section",
+      "",
+      "Gone from the template.",
+    ].join("\n");
+    const carried = carryWritten(template, previous);
+    expect(carried).toStartWith("The intro as written.\n\n## Counts");
+    expect(carried).toContain("<!-- /trove:counts -->\n\nLook at API2-1 first.\n\n## New section");
+    expect(carried).toContain("<!-- trove:items status=deferred -->");
+    expect(carried).toEndWith("<!-- write: not verified yet -->");
+    expect(carried).not.toContain("Gone from the template.");
+    expect(carried).not.toContain("| P | count |");
   });
 });

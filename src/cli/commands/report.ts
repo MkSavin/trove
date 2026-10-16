@@ -11,7 +11,7 @@ import { openFromFlags } from "../store.ts";
 
 export const report: Command = {
   name: "report",
-  summary: "Rebuild generated documents (all, or the named ones)",
+  summary: "Rebuild generated reports (all, or the named ones) and every live generated block",
   usage: "trove report [name...]",
   run: async (argv, io) => {
     const { values, positionals } = parse(argv, STORE_OPTIONS);

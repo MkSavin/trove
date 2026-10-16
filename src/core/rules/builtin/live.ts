@@ -24,7 +24,7 @@ export const liveBlockStale = defineRule({
   check: (doc, { index }) =>
     isSnapshot(doc, index) || fillLiveBlocks(doc.text, doc.rel, index).text === doc.text
       ? []
-      : [{ line: 1, message: "generated blocks are out of date: run trove report" }],
+      : [{ line: 1, message: "generated blocks are out of date: run trove refresh" }],
 });
 
 const WRITE_PLACE = /^\s*<!--\s*write:/;
