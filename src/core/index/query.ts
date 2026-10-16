@@ -1,4 +1,6 @@
 import { basename } from "node:path";
+import type { LedgerColumn } from "../config/schema.ts";
+import { cellValues, isBlankCell } from "../document/cell.ts";
 import type { Document } from "../document/document.ts";
 import { staleDays } from "../document/freshness.ts";
 import type { Item } from "../document/ledger.ts";
@@ -67,7 +69,10 @@ export const itemField = (item: Item, field: string, index: StoreIndex): string 
     return String(pendingRefs(index, itemField(item, "blocked_by", index)).length > 0);
   }
   if (field === DRIFT) return itemDrift(index, item).state;
-  if (Object.hasOwn(item.values, field)) return item.values[field];
+  if (Object.hasOwn(item.values, field)) {
+    const value = item.values[field];
+    return isBlankCell(value) ? "" : value;
+  }
   const doc = itemDocument(item, index);
   return doc ? documentField(doc, field, index) : undefined;
 };
@@ -77,15 +82,31 @@ type Vocabulary = Readonly<Record<string, string>> | undefined;
 const documentVocabulary = (field: string, index: StoreIndex): Vocabulary =>
   field === "status" ? index.config.statuses : undefined;
 
-/** The vocabulary of the item's own ledger: a debt list may name its statuses differently. */
-const itemVocabulary = (item: Item, field: string, index: StoreIndex): Vocabulary =>
-  index.byRel.get(item.document)?.ledger?.config.columns.find((column) => column.key === field)
-    ?.enum;
+/** A column of the item's own ledger: a debt list may name its statuses differently. */
+export const itemColumn = (
+  item: Item,
+  field: string,
+  index: StoreIndex,
+): LedgerColumn | undefined =>
+  itemDocument(item, index)?.ledger?.config.columns.find((column) => column.key === field);
+
+/** Each part of a `multiple` column, one empty value when it is blank; none for a missing field. */
+export const itemValues = (item: Item, field: string, index: StoreIndex): string[] => {
+  const value = itemField(item, field, index);
+  if (value === undefined) return [];
+  if (!itemColumn(item, field, index)?.multiple) return [value];
+  const values = cellValues(value, true);
+  return values.length > 0 ? values : [""];
+};
 
 export const selectDocuments = (index: StoreIndex, filters: Filters): Document[] =>
   index.documents.filter((doc) =>
     Object.entries(filters).every(([field, wanted]) =>
-      fieldMatches(documentField(doc, field, index), documentVocabulary(field, index), wanted),
+      fieldMatches(
+        [documentField(doc, field, index)].filter((value) => value !== undefined),
+        documentVocabulary(field, index),
+        wanted,
+      ),
     ),
   );
 
@@ -94,7 +115,7 @@ export const itemMatches =
   (index: StoreIndex, filters: Filters) =>
   (item: Item): boolean =>
     Object.entries(filters).every(([field, wanted]) =>
-      fieldMatches(itemField(item, field, index), itemVocabulary(item, field, index), wanted),
+      fieldMatches(itemValues(item, field, index), itemColumn(item, field, index)?.enum, wanted),
     );
 
 /** Closed items are left out unless the filter names `state`. */

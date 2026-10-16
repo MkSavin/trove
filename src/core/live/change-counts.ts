@@ -1,7 +1,7 @@
 import type { Item } from "../document/ledger.ts";
 import type { StoreIndex } from "../index/index.ts";
-import { columnLabel, groupTitle, rowField } from "../reports/cells.ts";
-import { tableLines } from "../reports/section.ts";
+import { columnLabel, groupTitle } from "../reports/cells.ts";
+import { groupByField, tableLines } from "../reports/section.ts";
 import { compareNatural } from "../text/compare.ts";
 import { changeLabels } from "./changes.ts";
 
@@ -30,9 +30,7 @@ export const renderChangeCounts = (
       changes.map((change) => [change, String(countOf(rows, change))]),
     );
   }
-  const groups = [...Map.groupBy(rows, (row) => rowField(row, by, index) ?? "")].toSorted(
-    ([a], [b]) => compareNatural(a, b),
-  );
+  const groups = [...groupByField(rows, by, index)].toSorted(([a], [b]) => compareNatural(a, b));
   return tableLines(
     [label ?? columnLabel(column(by), index), ...changes],
     groups.map(([value, members]) => [

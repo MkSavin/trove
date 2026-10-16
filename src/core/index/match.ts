@@ -16,17 +16,17 @@ const matchesOne = (raw: string, vocabulary: Vocabulary, pattern: string): boole
 };
 
 /**
- * A field passes when it matches one of the plain patterns (if any) and none of the `!` ones.
- * A missing field matches no pattern, so only negations accept it.
+ * A field passes when one of its values matches a plain pattern (if any) and none matches a `!`
+ * one. A missing field has no values, so only negations accept it.
  */
 export const fieldMatches = (
-  raw: string | undefined,
+  values: readonly string[],
   vocabulary: Vocabulary,
   wanted: readonly string[],
 ): boolean => {
   const excluded = wanted.filter((value) => value.startsWith(NOT)).map((value) => value.slice(1));
   const included = wanted.filter((value) => !value.startsWith(NOT));
   const hits = (patterns: readonly string[]) =>
-    raw !== undefined && patterns.some((pattern) => matchesOne(raw, vocabulary, pattern));
+    values.some((raw) => patterns.some((pattern) => matchesOne(raw, vocabulary, pattern)));
   return (included.length === 0 || hits(included)) && !hits(excluded);
 };

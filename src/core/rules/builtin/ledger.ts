@@ -1,4 +1,5 @@
 import { hasCapability, keyOf, ledgerOf } from "../../config/vocabulary.ts";
+import { cellValues } from "../../document/cell.ts";
 import type { Document } from "../../document/document.ts";
 import { fitsHeader } from "../../document/ledger.ts";
 import { splitRefs } from "../../document/refs.ts";
@@ -140,22 +141,21 @@ export const idFormat = defineRule({
 export const itemEnum = defineRule({
   id: "item-enum",
   level: "error",
-  summary: "Ledger cells with a vocabulary hold one of its values.",
+  summary: "Ledger cells with a vocabulary hold its values; blank and dash cells are skipped.",
   scope: "document",
   check: (doc) => {
     const enumerated = (doc.ledger?.config.columns ?? []).flatMap((column) =>
       column.enum ? [{ ...column, enum: column.enum }] : [],
     );
     return (doc.ledger?.items ?? []).flatMap((item) =>
-      enumerated
-        .filter((column) => {
-          const value = item.values[column.key];
-          return value !== undefined && keyOf(column.enum, value) === undefined;
-        })
-        .map((column) => ({
-          line: item.line,
-          message: `${column.label} of ${item.id} is outside the vocabulary: ${item.values[column.key]}`,
-        })),
+      enumerated.flatMap((column) => {
+        const outside = cellValues(item.values[column.key], column.multiple).filter(
+          (value) => keyOf(column.enum, value) === undefined,
+        );
+        if (outside.length === 0) return [];
+        const message = `${column.label} of ${item.id} is outside the vocabulary: ${outside.join(", ")}`;
+        return [{ line: item.line, message }];
+      }),
     );
   },
 });

@@ -2,7 +2,7 @@ import type { ReportSection } from "../config/schema.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { selectDocuments, selectItems } from "../index/query.ts";
 import { compareNatural, compareText } from "../text/compare.ts";
-import { cellText, columnLabel, groupTitle, type ReportRow, rowField } from "./cells.ts";
+import { cellText, columnLabel, groupTitle, type ReportRow, rowField, rowValues } from "./cells.ts";
 
 export type RenderedSection = { blocks: string[][]; rows: number };
 
@@ -47,13 +47,28 @@ const renderTable = (
     rows.map((row) => section.columns.map((c) => cellText(row, c, index, outputDir))),
   );
 
+/** Rows by value of the field; a row of several values counts under each. */
+export const groupByField = <Row extends ReportRow>(
+  rows: readonly Row[],
+  field: string,
+  index: StoreIndex,
+): Map<string, Row[]> => {
+  const groups = new Map<string, Row[]>();
+  for (const row of rows) {
+    for (const value of rowValues(row, field, index)) {
+      groups.set(value, [...(groups.get(value) ?? []), row]);
+    }
+  }
+  return groups;
+};
+
 export const renderCounts = (
   rows: readonly ReportRow[],
   field: string,
   index: StoreIndex,
   { label, outputDir }: { label?: string | undefined; outputDir: string },
 ): string[] => {
-  const counts = [...Map.groupBy(rows, (row) => rowField(row, field, index) ?? "")]
+  const counts = [...groupByField(rows, field, index)]
     .toSorted(([a], [b]) => compareNatural(a, b))
     .map(([value, members]) => [
       groupTitle(value, field, outputDir) || "—",
@@ -69,7 +84,7 @@ export const groupRows = <Row extends ReportRow>(
   section: Pick<ReportSection, "groupBy" | "groupOrder">,
   index: StoreIndex,
 ) => {
-  const groups = Map.groupBy(rows, (row) => rowField(row, section.groupBy ?? "", index) ?? "");
+  const groups = groupByField(rows, section.groupBy ?? "", index);
   const archived = (name: string) => name.startsWith(`${index.config.archive.folder}/`);
   const rest = [...groups.keys()]
     .filter((name) => !section.groupOrder.includes(name))

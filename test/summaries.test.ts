@@ -20,20 +20,23 @@ describe("filters", () => {
   const vocabulary = { open: "открыто" };
 
   test("exact by raw text or vocabulary key, substring, glob, negation", () => {
-    expect(fieldMatches("открыто", vocabulary, ["open"])).toBe(true);
-    expect(fieldMatches("web/composer + Drafts", undefined, ["~COMPOSER"])).toBe(true);
-    expect(fieldMatches("audits/mobile/AUDIT_MOBILE_1.md", undefined, ["audits/mobile/**"])).toBe(
-      true,
-    );
-    expect(fieldMatches("audits/mobile/AUDIT_MOBILE_1.md", undefined, ["!audits/mobile/**"])).toBe(
-      false,
-    );
-    expect(fieldMatches("audits/AUDIT_WEB_1.md", undefined, ["!audits/mobile/**"])).toBe(true);
+    const mobile = ["audits/mobile/AUDIT_MOBILE_1.md"];
+    expect(fieldMatches(["открыто"], vocabulary, ["open"])).toBe(true);
+    expect(fieldMatches(["web/composer + Drafts"], undefined, ["~COMPOSER"])).toBe(true);
+    expect(fieldMatches(mobile, undefined, ["audits/mobile/**"])).toBe(true);
+    expect(fieldMatches(mobile, undefined, ["!audits/mobile/**"])).toBe(false);
+    expect(fieldMatches(["audits/AUDIT_WEB_1.md"], undefined, ["!audits/mobile/**"])).toBe(true);
   });
 
   test("a missing field passes only negations", () => {
-    expect(fieldMatches(undefined, undefined, ["x"])).toBe(false);
-    expect(fieldMatches(undefined, undefined, ["!x"])).toBe(true);
+    expect(fieldMatches([], undefined, ["x"])).toBe(false);
+    expect(fieldMatches([], undefined, ["!x"])).toBe(true);
+  });
+
+  test("a field of several values passes when one matches and none is excluded", () => {
+    expect(fieldMatches(["web", "api"], undefined, ["api"])).toBe(true);
+    expect(fieldMatches(["web", "api"], undefined, ["!api"])).toBe(false);
+    expect(fieldMatches(["web", "api"], undefined, ["mobile"])).toBe(false);
   });
 
   test("repeated CLI filters add up", () => {

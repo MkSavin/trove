@@ -48,6 +48,8 @@ const ledgerColumn = z.strictObject({
   label: z.string(),
   required: z.boolean().default(false),
   enum: enumeration.optional(),
+  /** Cells hold comma-separated values, e.g. `web, api`; filters and groups take each one. */
+  multiple: z.boolean().default(false),
 });
 
 const PLACEHOLDER = /\{\w+\}/;

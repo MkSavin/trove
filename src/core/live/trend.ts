@@ -11,7 +11,7 @@ import { itemsAt } from "./items-at.ts";
 import { commitBefore } from "./since.ts";
 import { storeAt } from "./store-start.ts";
 import { eventSubject, type TrendKind, weekEvents } from "./trend-events.ts";
-import { groupValue } from "./trend-group.ts";
+import { groupValues } from "./trend-group.ts";
 
 type Args = Readonly<Record<string, string>>;
 
@@ -142,13 +142,13 @@ export const renderTrend = (
       [week, ...counts],
       weeks.map((w) => [weekCell(w), ...cells(tally(w, () => true))]),
     );
-  const fieldOf = groupValue(index, by, fallback);
+  const valuesOf = groupValues(index, by, fallback);
   const header = label ?? columnLabel({ key: by, label: undefined, empty: undefined }, index);
   const rows = weeks.flatMap((w) => {
-    const values = new Set([...w.open, ...(w.events ?? []).map((e) => e.item)].map(fieldOf));
+    const values = new Set([...w.open, ...(w.events ?? []).map((e) => e.item)].flatMap(valuesOf));
     return [...values]
       .toSorted(compareNatural)
-      .map((value) => ({ value, numbers: tally(w, (item) => fieldOf(item) === value) }))
+      .map((value) => ({ value, numbers: tally(w, (item) => valuesOf(item).includes(value)) }))
       .filter(({ numbers }) => numbers.some((n) => n !== undefined && n > 0))
       .map(({ value, numbers }) => [
         weekCell(w),

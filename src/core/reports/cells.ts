@@ -6,7 +6,7 @@ import type { Item } from "../document/ledger.ts";
 import { rebaseText } from "../edit/links.ts";
 import { type Drift, itemDrift } from "../index/drift.ts";
 import type { StoreIndex } from "../index/index.ts";
-import { DRIFT, documentField, itemField } from "../index/query.ts";
+import { DRIFT, documentField, itemField, itemValues } from "../index/query.ts";
 
 /** An item whose document cell names where it went after the document it is counted in. */
 export type MovedItem = Item & { movedTo: string };
@@ -32,6 +32,13 @@ export const groupTitle = (name: string, key: string, outputDir: string): string
 
 export const rowField = (row: ReportRow, key: string, index: StoreIndex): string | undefined =>
   isDocument(row) ? documentField(row, key, index) : itemField(row, key, index);
+
+/** Values a row is grouped under: each one of a `multiple` column, else its field or empty. */
+export const rowValues = (row: ReportRow, key: string, index: StoreIndex): string[] => {
+  if (isDocument(row)) return [documentField(row, key, index) ?? ""];
+  const values = itemValues(row, key, index);
+  return values.length > 0 ? [...new Set(values)] : [""];
+};
 
 export const columnLabel = (column: ReportColumn, index: StoreIndex): string =>
   column.label ??

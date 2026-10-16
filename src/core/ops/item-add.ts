@@ -1,5 +1,6 @@
 import type { LedgerConfig } from "../config/schema.ts";
 import { labelOf } from "../config/vocabulary.ts";
+import { isBlankCell } from "../document/cell.ts";
 import type { Document } from "../document/document.ts";
 import type { LedgerTable } from "../document/ledger.ts";
 import { appendRow } from "../edit/ledger.ts";
@@ -100,7 +101,9 @@ export const addItem = (index: StoreIndex, input: NewItem): Plan => {
   const { section: _, ...cellValues } = input.values;
   const values: Record<string, string> = { ...cellValues, id, status };
 
-  const missing = ledger.columns.filter((column) => column.required && !values[column.key]);
+  const missing = ledger.columns.filter(
+    (column) => column.required && isBlankCell(values[column.key]),
+  );
   if (missing.length > 0) {
     throw new TroveError(`missing ${missing.map((column) => column.key).join(", ")}`);
   }
