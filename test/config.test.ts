@@ -24,6 +24,19 @@ describe("config", () => {
     expect(config.rules).toEqual({});
   });
 
+  test("labels of generated blocks a config leaves out come in its language", () => {
+    const russian = parseConfig(
+      `${MINIMAL}language: ru\nlabels: { statusLine: Status, changeAdded: new }`,
+      "inline",
+    );
+    expect(russian.labels.statusLine).toBe("Status");
+    expect(russian.labels.changeAdded).toBe("new");
+    expect(russian.labels.changeClosed).toBe("закрыт");
+    expect(russian.labels.ownCommits).toBe("свои");
+    expect(parseConfig(`${MINIMAL}language: ru`, "inline").labels.checked).toBe("Checked");
+    expect(parseConfig(MINIMAL, "inline").labels.changeClosed).toBe("closed");
+  });
+
   test("normalizes shorthand field specs and rule levels", () => {
     const config = parseConfig(
       `${MINIMAL}fields: { slug: required }\nrules: { stale: off, unknown-field: { level: error, since: 2026-09-01 } }`,

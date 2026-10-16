@@ -1,6 +1,10 @@
+import { posix } from "node:path";
+import type { Document } from "../document/document.ts";
+import { splitRefs } from "../document/refs.ts";
 import { TroveError } from "../errors.ts";
 import { git } from "../git/git.ts";
 import type { StoreIndex } from "../index/index.ts";
+import { findDocument } from "../index/resolve.ts";
 import { parseFrontMatter } from "../markdown/front-matter.ts";
 import { compareText } from "../text/compare.ts";
 import { isIsoDate } from "../text/dates.ts";
@@ -20,24 +24,50 @@ const commitBefore = async (root: string, date: string): Promise<Start> => {
   return { commit: found.ok ? firstLine(found.out) : undefined };
 };
 
-const addedIn = async (root: string, rel: string): Promise<string | undefined> =>
-  firstLine(
-    (await git(root, ["log", "--follow", "--diff-filter=A", "--format=%H", "--", rel])).out,
-  );
+/**
+ * The commit that first added a file of this name, wherever it was then. Renames are not followed:
+ * git would take a new summary for its predecessor renamed.
+ */
+const addedIn = async (root: string, rel: string): Promise<string | undefined> => {
+  const pathspec = `:(glob)**/${posix.basename(rel)}`;
+  const added = await git(root, [
+    "log",
+    "--no-renames",
+    "--diff-filter=A",
+    "--format=%H",
+    "--",
+    pathspec,
+  ]);
+  return added.out.split("\n").filter(Boolean).at(-1);
+};
 
-const order = (date: string | undefined, rel: string): string => `${date ?? ""}\0${rel}`;
+const order = (doc: Document): string => `${doc.meta.date ?? ""}\0${doc.rel}`;
 
-/** The summary of the same kind written last before this one. */
-const previousSummary = (index: StoreIndex, source: BlockSource) => {
+const latest = (docs: readonly Document[]): Document | undefined =>
+  docs.toSorted((a, b) => compareText(order(a), order(b))).at(-1);
+
+/**
+ * The summary this one replaced, named by `supersedes` or `superseded_by`; else the latest of the
+ * same kind dated before it, so a sibling written the same day never counts.
+ */
+const previousSummary = (index: StoreIndex, source: BlockSource): Document | undefined => {
   const fields = parseFrontMatter(splitLines(source.text))?.fields;
   const kind = fields?.get("kind")?.value;
   if (!kind)
     throw new TroveError("since=previous needs a summary with a kind: give since=<date|commit>");
-  const own = order(fields?.get("date")?.value ?? index.today, source.rel);
-  return index.documents
-    .filter((doc) => doc.meta.kind === kind && order(doc.meta.date, doc.rel) < own)
-    .toSorted((a, b) => compareText(order(a.meta.date, a.rel), order(b.meta.date, b.rel)))
-    .at(-1);
+  const date = fields?.get("date")?.value ?? index.today;
+  const name = posix.basename(source.rel);
+  const names = new Set([name, name.replace(/\.md$/, "")]);
+  const supersedes = new Set(
+    splitRefs(fields?.get("supersedes")?.value ?? "").map((ref) => findDocument(index, ref)?.rel),
+  );
+  const others = index.documents.filter((doc) => doc.meta.kind === kind && doc.rel !== source.rel);
+  const replaced = others.filter(
+    (doc) =>
+      supersedes.has(doc.rel) ||
+      splitRefs(doc.meta.superseded_by ?? "").some((ref) => names.has(ref)),
+  );
+  return latest(replaced) ?? latest(others.filter((doc) => (doc.meta.date ?? "") < date));
 };
 
 /** `since=previous|<date>|<commit>`; nothing when there is no previous summary to start from. */

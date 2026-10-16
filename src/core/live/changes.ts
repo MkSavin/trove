@@ -9,6 +9,7 @@ import { documentCell } from "../reports/cells.ts";
 import { documentPath } from "../store/walk.ts";
 import { compareNatural } from "../text/compare.ts";
 import type { BlockSource } from "./git-data.ts";
+import { movedOut } from "./moved-out.ts";
 import { startOf } from "./since.ts";
 
 type Args = Readonly<Record<string, string>>;
@@ -79,9 +80,40 @@ const changeOf = (then: Item | undefined, now: Item | undefined): Change | undef
 const currentRel = (index: StoreIndex, rel: string): string =>
   index.byRel.has(rel) ? rel : (index.byName.get(basename(rel))?.rel ?? rel);
 
+/** The change values in the order rows come in. */
+export const changeLabels = (config: Config): string[] =>
+  ORDER.map((change) => config.labels[LABEL[change]]);
+
+type Row = { change: Change; item: Item; from: string | undefined; to: string | undefined };
+
+/** An item closed as moved counts as moved, shown where its new id lives when that is found. */
+const rowOf = (
+  index: StoreIndex,
+  before: Item | undefined,
+  after: Item | undefined,
+  now: ReadonlyMap<string, Item>,
+): Row | undefined => {
+  const found = changeOf(before, after);
+  const item = after ?? before;
+  if (!found || !item) return undefined;
+  const from = before && currentRel(index, before.document);
+  const moved =
+    found === "closed" && before && from ? movedOut(index, before, after, from) : undefined;
+  const change = moved ? "moved" : found;
+  const target = moved?.to === undefined ? undefined : now.get(moved.to);
+  const document = currentRel(index, target?.document ?? item.document);
+  const closed = item.closed || found === "closed";
+  return {
+    change,
+    item: { ...item, document, closed },
+    from: change === "moved" ? from : undefined,
+    to: moved?.to,
+  };
+};
+
 /**
- * Items closed, added and moved to a document of another name since the baseline, as items with
- * a `change` value and, for moves, `from`.
+ * Items closed, added and moved since the baseline, as items with a `change` value and, for
+ * moves, `from` and, when the item took a new id, `to`; that new id is not listed as added.
  */
 export const changeRows = (
   index: StoreIndex,
@@ -90,25 +122,24 @@ export const changeRows = (
 ): Item[] => {
   const then = new Map(baseline.map((item) => [item.id, item]));
   const now = new Map(index.items.map((item) => [item.id, item]));
-  return [...new Set([...then.keys(), ...now.keys()])]
-    .flatMap((id) => {
-      const before = then.get(id);
-      const after = now.get(id);
-      const change = changeOf(before, after);
-      const item = after ?? before;
-      if (!change || !item) return [];
-      const from =
-        change === "moved" && before
-          ? { from: documentCell(currentRel(index, before.document), index, outputDir) }
-          : {};
-      const values = { ...item.values, change: index.config.labels[LABEL[change]], ...from };
-      const document = currentRel(index, item.document);
-      const closed = item.closed || change === "closed";
-      return [{ change, item: { ...item, document, closed, values } }];
-    })
+  const rows = [...new Set([...then.keys(), ...now.keys()])].flatMap((id) => {
+    const row = rowOf(index, then.get(id), now.get(id), now);
+    return row ? [row] : [];
+  });
+  const targets = new Set(rows.map((row) => row.to));
+  return rows
+    .filter((row) => row.change !== "added" || !targets.has(row.item.id))
     .toSorted(
       (a, b) =>
         ORDER.indexOf(a.change) - ORDER.indexOf(b.change) || compareNatural(a.item.id, b.item.id),
     )
-    .map(({ item }) => item);
+    .map(({ change, item, from, to }) => {
+      const values = {
+        ...item.values,
+        change: index.config.labels[LABEL[change]],
+        ...(from === undefined ? {} : { from: documentCell(from, index, outputDir) }),
+        ...(to === undefined ? {} : { to }),
+      };
+      return { ...item, values };
+    });
 };
