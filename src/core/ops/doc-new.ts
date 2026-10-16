@@ -3,7 +3,7 @@ import { fieldSpecs } from "../config/vocabulary.ts";
 import { TroveError } from "../errors.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { fillTemplate, type NewDocument, renderNewDocument } from "../templates/new-document.ts";
-import { documentName, nameBase, placementOf } from "./naming.ts";
+import { documentName, nameBase, placementOf, prefixedStem } from "./naming.ts";
 import type { Plan } from "./plan.ts";
 
 export type NewDocumentInput = {
@@ -44,7 +44,11 @@ export const newDocument = async (index: StoreIndex, input: NewDocumentInput): P
   if (!kind) throw new TroveError(`unknown type ${input.type}`);
 
   const { folder, prefix } = placementOf(index.config, input.type);
-  const name = documentName(index, input.type, `${prefix}${input.name ?? nameBase(input.topic)}`);
+  const name = documentName(
+    index,
+    input.type,
+    prefixedStem(prefix, input.name ?? nameBase(input.topic)),
+  );
   const specs = fieldSpecs(index.config, kind);
   const slug = Object.hasOwn(specs, "slug") ? defaultSlug(name, prefix) : undefined;
   const given: Record<string, string | undefined> = { slug, ...input.fields };

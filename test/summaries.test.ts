@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { cp, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseFilters } from "../src/cli/args.ts";
 import { fieldMatches } from "../src/core/index/match.ts";
 import { queryRows } from "../src/core/index/rows.ts";
 import { refreshPlan } from "../src/core/ops/refresh.ts";
+import { refreshGenerated } from "../src/core/reports/embeds.ts";
 import { carryWritten } from "../src/core/summaries/carry.ts";
 import { newSummary, showSummary } from "../src/core/summaries/summaries.ts";
 import { emptyWritePlaces } from "../src/core/summaries/write-places.ts";
@@ -120,6 +123,13 @@ describe("summaries", () => {
     );
   });
 
+  test("a name that already carries the prefix is the whole file name", async () => {
+    for (const name of ["SUMMARY_MEETINGS_2026-10-16-dry", "SUMMARY_MEETINGS_2026-10-16-dry.md"]) {
+      const plan = await newSummary(store.index, { kind: "web", name, keep: true });
+      expect(plan.changes[0]?.rel).toBe("summaries/SUMMARY_MEETINGS_2026-10-16-dry.md");
+    }
+  });
+
   test("an unknown kind or a taken name is refused", async () => {
     await expect(newSummary(store.index, { kind: "nope" })).rejects.toThrow(
       /known: web, outside-web/,
@@ -151,6 +161,45 @@ describe("refresh", () => {
     const archived = later.index.documents.find((doc) => doc.place === "archive");
     if (!archived) throw new Error("the sandbox has an archive");
     await expect(refreshPlan(later.index, [archived])).rejects.toThrow(/is archived/);
+  });
+});
+
+describe("text copied into generated blocks", () => {
+  test("relative links are rebased on the folder of the document that shows them", async () => {
+    const root = await mkdtemp(join(tmpdir(), "trove-links-"));
+    try {
+      await cp(SANDBOX, root, { recursive: true });
+      const edit = async (rel: string, from: string, to: string) => {
+        const file = Bun.file(join(root, rel));
+        await Bun.write(file, (await file.text()).replace(from, to));
+      };
+      await edit(
+        "plans/PLAN_PUSH_RETRY.md",
+        "Stage 1 merged,",
+        "Stage 1 merged after [PLAN_OFFLINE_MODE](PLAN_OFFLINE_MODE.md#outbox), see [docs](https://example.com/a.md),",
+      );
+      await edit(
+        "audits/AUDIT_API_2.md",
+        "after logout on another device |",
+        "after logout, see [plan](../plans/PLAN_OFFLINE_MODE.md) |",
+      );
+      const { index } = await openStore({ cwd: root, store: root, today: TODAY });
+      const notes = refreshGenerated(
+        '<!-- trove:documents type=plan as=list format="{document}: {note}" -->\n<!-- /trove:documents -->',
+        "summaries/NOTES.md",
+        index,
+      );
+      expect(notes).toContain("[PLAN_OFFLINE_MODE](../plans/PLAN_OFFLINE_MODE.md#outbox)");
+      expect(notes).toContain("[docs](https://example.com/a.md)");
+      const items = refreshGenerated(
+        "<!-- trove:items owner=api columns=id,what -->\n<!-- /trove:items -->",
+        "ITEMS.md",
+        index,
+      );
+      expect(items).toContain("see [plan](plans/PLAN_OFFLINE_MODE.md) |");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -233,6 +282,65 @@ describe("carrying a summary over", () => {
     const fallback = carryWritten(template, unlabelled);
     expect(fallback).toContain("<!-- write: what changed -->\nTwo items closed.\n\n## Risks");
     expect(fallback).toEndWith("<!-- write: the risks -->");
+  });
+
+  test("text after a block follows that block's opening line, not how many blocks sit above", () => {
+    const template = [
+      "## New",
+      "",
+      "<!-- trove:items status=deferred -->",
+      "<!-- /trove:items -->",
+      "",
+      "<!-- write: -->",
+      "",
+      "## Urgent",
+      "",
+      "<!-- trove:items priority=P0,P1 -->",
+      "<!-- /trove:items -->",
+      "",
+      "<!-- write: -->",
+      "",
+      "## Devops",
+      "",
+      "<!-- trove:items area=devops -->",
+      "<!-- /trove:items -->",
+      "",
+      "<!-- write: -->",
+      "",
+      "## Moved",
+      "",
+      "<!-- trove:items area=web -->",
+      "<!-- /trove:items -->",
+      "",
+      "<!-- write: -->",
+    ].join("\n");
+    const previous = [
+      "## Urgent",
+      "",
+      "<!-- trove:items priority=P0,P1 -->",
+      "| API2-1 |",
+      "<!-- /trove:items -->",
+      "",
+      "Urgent notes.",
+      "",
+      "## Devops",
+      "",
+      "<!-- trove:items area=devops -->",
+      "<!-- /trove:items -->",
+      "",
+      "Devops notes.",
+      "",
+      "## Moved",
+      "",
+      "Web notes under the heading.",
+    ].join("\n");
+    const carried = carryWritten(template, previous);
+    expect(carried).toContain(
+      "## New\n\n<!-- trove:items status=deferred -->\n<!-- /trove:items -->\n\n<!-- write: -->\n\n## Urgent",
+    );
+    expect(carried).toContain("<!-- write: -->\nUrgent notes.\n\n## Devops");
+    expect(carried).toContain("<!-- write: -->\nDevops notes.\n\n## Moved");
+    expect(carried).toEndWith("<!-- write: -->\nWeb notes under the heading.");
   });
 
   test("a place counts as written once text sits under its label", () => {

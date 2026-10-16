@@ -1,4 +1,4 @@
-import { basename } from "node:path";
+import { basename, posix } from "node:path";
 import type { Config } from "../config/schema.ts";
 import type { Item } from "../document/ledger.ts";
 import { TroveError } from "../errors.ts";
@@ -100,11 +100,7 @@ const rowOf = (
  * Items closed, added and moved since the baseline, as items with a `change` value and, for
  * moves, `from` and, when the item took a new id, `to`; that new id is not listed as added.
  */
-export const changeRows = (
-  index: StoreIndex,
-  baseline: readonly Item[],
-  outputDir: string,
-): Item[] => {
+export const changeRows = (index: StoreIndex, baseline: readonly Item[]): Item[] => {
   const then = new Map(baseline.map((item) => [item.id, item]));
   const now = new Map(index.items.map((item) => [item.id, item]));
   const rows = [...new Set([...then.keys(), ...now.keys()])].flatMap((id) => {
@@ -122,7 +118,9 @@ export const changeRows = (
       const values = {
         ...item.values,
         change: index.config.labels[LABEL[change]],
-        ...(from === undefined ? {} : { from: documentCell(from, index, outputDir) }),
+        ...(from === undefined
+          ? {}
+          : { from: documentCell(from, index, posix.dirname(item.document)) }),
         ...(to === undefined ? {} : { to }),
       };
       return { ...item, values };

@@ -60,12 +60,15 @@ const located = (index: StoreIndex, item: Item): LocatedItem => {
   return found;
 };
 
+/** Only the rechecked rows change; a new column leaves the other rows as they are. */
 const tablePatches = (doc: Document, table: LedgerTable, written: readonly Written[]): Patch[] => {
-  const column = table.keys.indexOf(CHECKED);
-  if (column >= 0) return written.map(({ located, value }) => setCell(located.row, column, value));
+  const found = table.keys.indexOf(CHECKED);
+  const column = found >= 0 ? found : table.keys.length;
   const label = written[0]?.located.ledger.columns.find((c) => c.key === CHECKED)?.label ?? CHECKED;
-  const values = new Map(written.map(({ located, value }) => [located.row, value]));
-  return appendColumn(doc, table, label, (row) => values.get(row) ?? "");
+  return [
+    ...(found >= 0 ? [] : appendColumn(doc, table, label)),
+    ...written.map(({ located, value }) => setCell(located.row, column, value)),
+  ];
 };
 
 const documentText = (doc: Document, written: readonly Written[]): string => {

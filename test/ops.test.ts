@@ -285,6 +285,13 @@ describe("doc operations", () => {
     ).rejects.toThrow(/PLAN_OFFLINE_MODE.md already exists/);
   });
 
+  test("new takes a name that already has the prefix as it is", async () => {
+    const store = await sandbox();
+    const input = { type: "plan", topic: "x", name: "PLAN_SYNC.md", fields: { scope: "s" } };
+    const [change] = (await newDocument(store.index, input)).changes;
+    expect(change?.rel).toBe("plans/PLAN_SYNC.md");
+  });
+
   test("new transliterates Cyrillic topics and keeps the first words of long ones", () => {
     expect(nameBase("Переезд архива на trove: чего не хватает")).toBe(
       "PEREEZD_ARKHIVA_NA_TROVE_CHEGO_NE_KHVATAET",

@@ -1,5 +1,6 @@
 import { hasCapability, keyOf, ledgerOf } from "../../config/vocabulary.ts";
 import type { Document } from "../../document/document.ts";
+import { fitsHeader } from "../../document/ledger.ts";
 import { splitRefs } from "../../document/refs.ts";
 import type { StoreIndex } from "../../index/index.ts";
 import { defineRule, type Finding, type StoreFinding } from "../rule.ts";
@@ -72,19 +73,23 @@ export const ledgerColumns = defineRule({
 export const ledgerRowShape = defineRule({
   id: "ledger-row-shape",
   level: "error",
-  summary: "Each ledger row has as many cells as its header: a `|` inside a cell breaks it.",
+  summary:
+    "Each ledger row has as many cells as its header, trailing optional ones aside: a `|` inside a cell breaks it.",
   scope: "document",
-  check: (doc) =>
-    (doc.ledger?.tables ?? []).flatMap((table) =>
+  check: (doc) => {
+    const ledger = doc.ledger;
+    if (!ledger) return [];
+    return ledger.tables.flatMap((table) =>
       table.header
         ? table.rows
-            .filter((row) => row.cells.length !== table.keys.length)
+            .filter((row) => !fitsHeader(row.cells.length, table.keys, ledger.config))
             .map((row) => ({
               line: row.line.number,
               message: `${row.cells.length} cells against ${table.keys.length} in the header; a | inside a cell?`,
             }))
         : [],
-    ),
+    );
+  },
 });
 
 export const idHyphen = defineRule({

@@ -44,12 +44,24 @@ type Context = {
   section: string | undefined;
 };
 
+/** A row may leave out trailing cells of optional columns: Markdown reads them as empty. */
+export const fitsHeader = (
+  cells: number,
+  keys: readonly (string | undefined)[],
+  config: LedgerConfig,
+): boolean =>
+  cells === keys.length ||
+  (cells < keys.length &&
+    keys
+      .slice(cells)
+      .every((key) => !config.columns.find((column) => column.key === key)?.required));
+
 const toItem = (
   row: TableRow,
   keys: readonly (string | undefined)[],
   context: Context,
 ): Item | undefined => {
-  if (row.cells.length !== keys.length) return undefined;
+  if (!fitsHeader(row.cells.length, keys, context.config)) return undefined;
   const values = Object.fromEntries(
     keys.flatMap((key, i) => (key ? [[key, row.cells[i] ?? ""]] : [])),
   );

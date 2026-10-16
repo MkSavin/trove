@@ -126,7 +126,7 @@ const changes: View = (args, context) => {
   const { since: _, ...rest } = args;
   const outputDir = posix.dirname(context.rel);
   const config = context.index.config;
-  const rows = changeRows(context.index, before, outputDir).filter(
+  const rows = changeRows(context.index, before).filter(
     itemMatches(context.index, filtersOf(rest, context.base)),
   );
   const note = moved ? [baseNote(config, moved), ""] : [];

@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { setCell } from "../src/core/edit/ledger.ts";
+import { applyPatches } from "../src/core/edit/patch.ts";
 import { findBlock } from "../src/core/markdown/blocks.ts";
 import { fencedLines } from "../src/core/markdown/fences.ts";
 import { parseFrontMatter } from "../src/core/markdown/front-matter.ts";
@@ -53,6 +55,33 @@ describe("parseTables", () => {
     const [table] = parseTables(splitLines("| id | what |\n| -- | ---- |\n| A-1 | x | y |"));
     expect(table?.header?.cells).toEqual(["id", "what"]);
     expect(table?.rows[0]?.cells).toEqual(["A-1", "x", "y"]);
+  });
+});
+
+describe("setCell", () => {
+  const text = [
+    "| id     | checked    |",
+    "| ------ | ---------- |",
+    "| WEB1-1 | 2026-10-01 |",
+    "| WEB1-2 |            |",
+    "| WEB1-3 |",
+  ].join("\n");
+  const [table] = parseTables(splitLines(text));
+  const set = (at: number, value: string) => {
+    const row = table?.rows[at];
+    if (!row) throw new Error(`no row ${at}`);
+    return applyPatches(text, [setCell({ ...row, item: undefined }, 1, value)]).split("\n");
+  };
+
+  test("keeps a padded column's width and leaves the other rows alone", () => {
+    const lines = set(1, "856a559");
+    expect(lines[3]).toBe("| WEB1-2 | 856a559    |");
+    expect(lines.filter((line, i) => line !== text.split("\n")[i])).toHaveLength(1);
+    expect(set(0, "a-longer-commit-id")[2]).toBe("| WEB1-1 | a-longer-commit-id |");
+  });
+
+  test("adds the cells a short row leaves out", () => {
+    expect(set(2, "856a559")[4]).toBe("| WEB1-3 | 856a559 |");
   });
 });
 
