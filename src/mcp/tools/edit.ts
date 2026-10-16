@@ -72,7 +72,7 @@ export const registerEditTools = (server: McpServer, context: Context): void => 
     "trove_create",
     {
       description:
-        "Create a document from its type's template: folder, prefix, next series number and slug are chosen for you. Required header fields go in fields, e.g. {scope: 'web/'}. With kind, a summary of that configured kind instead: generated blocks filled, <!-- write: … --> places left for you to write up; filters narrow it further.",
+        "Create a document from its type's template: folder, prefix, next series number and slug are chosen for you. Required header fields go in fields, e.g. {scope: 'web/'}. With kind, a summary of that configured kind instead: generated blocks filled, <!-- write: … --> places left for you to write up under their line, which stays; filters narrow it further.",
       inputSchema: z.object({
         store: storeField,
         type: z.string(),

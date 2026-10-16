@@ -29,7 +29,7 @@ A store is a git repository of Markdown documents for one project. Its rules liv
 - Repeatable re-check: `trove_update` `{document, field: "verify-cmd", value}`, a shell command that exits 0 while what the document describes still holds, e.g. `git -C {root:app} grep -q presence.v2 -- api/hub.go`. The user runs them with `trove check --verify`.
 - Finished plan or spec: `trove_transition` `{document, to: "archive"}`.
 - Wrong type, such as research that turned into a plan of work: `trove_transition` `{document, to: "type", type: "plan"}`. Which type fits: `trove_regulation` `placement`.
-- New summary: `trove_create` `{kind, topic}` (`trove summary new <kind>`). Its `<!-- trove:… -->` blocks are generated; write up every `<!-- write: … -->` place from what the blocks show and the documents they link, then delete the marker.
+- New summary: `trove_create` `{kind, topic}` (`trove summary new <kind>`). Its `<!-- trove:… -->` blocks are generated; write up every `<!-- write: … -->` place from what the blocks show and the documents they link, under its marker line: keep the line, the next summary carries the text over by it.
 - Never edit inside `<!-- trove:… -->` blocks: change the documents they come from, or the block's options.
 - Use `dryRun: true` when unsure; read the diff before writing.
 - A refused edit lists the errors it would add. Fix the cause; do not hand-edit around it.

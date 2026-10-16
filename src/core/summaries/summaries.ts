@@ -14,7 +14,7 @@ import { archivePlan } from "../ops/doc-archive.ts";
 import { initialStatus } from "../ops/doc-new.ts";
 import { placementOf } from "../ops/naming.ts";
 import type { Plan } from "../ops/plan.ts";
-import { thenPlan } from "../ops/with-changes.ts";
+import { thenPlan, withChanges } from "../ops/with-changes.ts";
 import { refreshGenerated } from "../reports/embeds.ts";
 import { compareText } from "../text/compare.ts";
 import { carryWritten } from "./carry.ts";
@@ -134,18 +134,21 @@ export const newSummary = async (index: StoreIndex, request: SummaryRequest): Pr
     throw new TroveError(`${stem}.md already exists: pass a name`);
   const rel = folder ? `${folder}/${stem}.md` : `${stem}.md`;
   const draft = await draftText(index, request);
-  const text = refreshGenerated(draft, rel, await withGitData(index, [{ rel, text: draft }]));
   const plan = supersede(
     index,
     {
-      changes: [{ rel, text }],
-      notes: [`created ${rel}: fill the <!-- write: … --> places`],
+      changes: [{ rel, text: draft }],
+      notes: [`created ${rel}: write under each <!-- write: … --> place, keeping the line`],
       message: `docs: add ${stem}`,
     },
     rel,
     request,
   );
-  return { ...plan, message: `docs: add ${stem}` };
+  // Filled once the summaries it replaces name it, so since=previous finds them.
+  const after = await withGitData(withChanges(index, plan.changes), [{ rel, text: draft }]);
+  const text = refreshGenerated(draft, rel, after);
+  const changes = plan.changes.map((change) => (change.rel === rel ? { ...change, text } : change));
+  return { ...plan, changes, message: `docs: add ${stem}` };
 };
 
 export const showSummary = async (index: StoreIndex, request: SummaryRequest): Promise<string> => {
