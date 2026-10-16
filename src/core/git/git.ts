@@ -41,6 +41,16 @@ export const git = async (
   return { ok: code === 0, out: raw ? out : out.trim(), err: err.trim() };
 };
 
+/** For reads during a synchronous query; callers cache the result per index. */
+export const gitSync = (cwd: string, args: readonly string[]): GitResult => {
+  const child = Bun.spawnSync(["git", ...args], { cwd, env: gitEnv(), stdin: "ignore" });
+  return {
+    ok: child.exitCode === 0,
+    out: child.stdout.toString().trim(),
+    err: child.stderr.toString().trim(),
+  };
+};
+
 export const gitOrThrow = async (
   cwd: string,
   args: readonly string[],

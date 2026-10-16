@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { Document } from "../document/document.ts";
 import { resolveFrom } from "../edit/links.ts";
-import { gitEnv } from "../git/git.ts";
+import { gitSync } from "../git/git.ts";
 import { type Link, type Pin, pinnedRef } from "../markdown/links.ts";
 import type { StoreIndex } from "./index.ts";
 
@@ -48,25 +48,15 @@ const treeAt = (index: StoreIndex, dir: string, ref: string): ReadonlySet<string
   trees.set(index, cache);
   const key = `${dir}\0${ref}`;
   if (!cache.has(key)) {
-    const args = ["git", "-C", dir, "ls-tree", "-r", "-t", "-z", "--name-only", ref];
-    const listed = Bun.spawnSync(args, { env: gitEnv(), stdin: "ignore" });
-    cache.set(
-      key,
-      listed.exitCode === 0
-        ? new Set(listed.stdout.toString().split("\0").filter(Boolean))
-        : undefined,
-    );
+    const listed = gitSync(dir, ["ls-tree", "-r", "-t", "-z", "--name-only", ref]);
+    cache.set(key, listed.ok ? new Set(listed.out.split("\0").filter(Boolean)) : undefined);
   }
   return cache.get(key);
 };
 
 /** Files git ignores, such as installed packages, are never in a commit: they are read from the checkout. */
 const ignoredInCheckout = (dir: string, absolute: string): boolean =>
-  existsSync(absolute) &&
-  Bun.spawnSync(["git", "-C", dir, "check-ignore", "-q", absolute], {
-    env: gitEnv(),
-    stdin: "ignore",
-  }).exitCode === 0;
+  existsSync(absolute) && gitSync(dir, ["check-ignore", "-q", absolute]).ok;
 
 const stateAt = (index: StoreIndex, root: CodeRoot, absolute: string, ref: string): LinkState => {
   const tree = treeAt(index, root.dir, ref);
@@ -102,8 +92,12 @@ const classify = (
   return { kind: "code", state: codeState(index, root, absolute, pin) };
 };
 
+/** Store-relative target of a link written in the document. */
+export const linkTarget = (doc: Document, link: Link): string =>
+  resolveFrom(doc.rel, decode(link.path));
+
 export const resolveLink = (index: StoreIndex, doc: Document, link: Link): ResolvedLink => {
-  const target = resolveFrom(doc.rel, decode(link.path));
+  const target = linkTarget(doc, link);
   const { pin } = link;
   return {
     file: doc.rel,

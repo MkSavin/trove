@@ -1,6 +1,7 @@
 import type { Document } from "../document/document.ts";
 import { staleDays } from "../document/freshness.ts";
 import type { Item } from "../document/ledger.ts";
+import { driftedFiles } from "./drift.ts";
 import type { StoreIndex } from "./index.ts";
 import { fieldMatches } from "./match.ts";
 
@@ -11,6 +12,7 @@ import { fieldMatches } from "./match.ts";
 export type Filters = Readonly<Record<string, readonly string[]>>;
 
 const STATE = "state";
+export const DRIFT = "drift";
 
 export const documentField = (
   doc: Document,
@@ -38,6 +40,7 @@ export const itemField = (item: Item, field: string, index: StoreIndex): string 
   if (field === "document") return item.document;
   if (field === "section") return item.section;
   if (field === STATE) return item.closed ? "closed" : "open";
+  if (field === DRIFT) return String(driftedFiles(index, item) !== undefined);
   if (Object.hasOwn(item.values, field)) return item.values[field];
   const doc = index.byRel.get(item.document);
   return doc ? documentField(doc, field, index) : undefined;

@@ -14,7 +14,7 @@ A store is a git repository of Markdown documents for one project. Its rules liv
 
 ## Read slices, not files
 
-- Find items: `trove_query` `{kind: "items", filters: {status: "open", owner: "web"}}` (`trove query items status=open owner=web`).
+- Find items: `trove_query` `{kind: "items", filters: {status: "open", owner: "web"}}` (`trove query items status=open owner=web`). `drift: "true"` lists items whose section links to code that changed after their document's `checked` date: re-check those first.
 - Find documents: `trove_query` `{kind: "documents", filters: {type: "plan", place: "work"}}`; `stale: "true"` lists what needs re-checking.
 - Read one finding: `trove_show` `{ref: "WEB1-4"}`; one section: `AUDIT_WEB_1#Ledger`; an outline: the document name.
 - Status of an area: `trove_summary` with a configured `kind` and/or filters, e.g. `{filters: {owner: "web", path: "!audits/mobile/**"}}`. Filters take `~substring`, globs and `!` to exclude, everywhere.
