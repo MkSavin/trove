@@ -3,6 +3,7 @@ import type { SummaryConfig } from "../config/schema.ts";
 import { fieldSpecs } from "../config/vocabulary.ts";
 import type { Document } from "../document/document.ts";
 import { setField } from "../edit/front-matter.ts";
+import { rebaseText } from "../edit/links.ts";
 import { applyPatches } from "../edit/patch.ts";
 import { TroveError } from "../errors.ts";
 import { mergeFilters } from "../index/filters.ts";
@@ -12,7 +13,7 @@ import { findDocument } from "../index/resolve.ts";
 import { withGitData } from "../live/git-data.ts";
 import { archivePlan } from "../ops/doc-archive.ts";
 import { initialStatus } from "../ops/doc-new.ts";
-import { placementOf } from "../ops/naming.ts";
+import { placementOf, prefixedStem } from "../ops/naming.ts";
 import type { Plan } from "../ops/plan.ts";
 import { thenPlan, withChanges } from "../ops/with-changes.ts";
 import { refreshGenerated } from "../reports/embeds.ts";
@@ -76,13 +77,20 @@ const writtenBody = (doc: Document): string => {
   return after ? doc.text.slice(after.end).replace(LEADING_BREAKS, "") : doc.text;
 };
 
-const draftText = async (index: StoreIndex, request: SummaryRequest): Promise<string> => {
+const draftText = async (
+  index: StoreIndex,
+  request: SummaryRequest,
+  rel: string,
+): Promise<string> => {
   const kind = kindOf(index, request.kind);
   const from = source(index, request);
   const template = request.kind
     ? await loadBody(index.root, index.config, kind)
     : defaultBody(index.config);
-  const body = from ? carryWritten(template, writtenBody(from)) : template;
+  const written = from
+    ? rebaseText(writtenBody(from), posix.dirname(from.rel), posix.dirname(rel))
+    : undefined;
+  const body = written === undefined ? template : carryWritten(template, written);
   const title = request.title ?? kind.title;
   return renderDraft(index.config, {
     kind: request.kind ?? "adhoc",
@@ -96,9 +104,11 @@ const draftText = async (index: StoreIndex, request: SummaryRequest): Promise<st
 };
 
 const stemFor = (index: StoreIndex, request: SummaryRequest, prefix: string): string =>
-  prefix +
-  (request.name ??
-    `${(request.kind ?? "summary").toUpperCase().replace(/\W+/g, "_")}_${index.today}`);
+  prefixedStem(
+    prefix,
+    request.name ??
+      `${(request.kind ?? "summary").toUpperCase().replace(/\W+/g, "_")}_${index.today}`,
+  );
 
 /** The earlier summaries of the kind still in work go to the archive, each naming its successor. */
 const supersede = (index: StoreIndex, plan: Plan, rel: string, request: SummaryRequest): Plan => {
@@ -133,7 +143,7 @@ export const newSummary = async (index: StoreIndex, request: SummaryRequest): Pr
   if (index.byName.has(`${stem}.md`))
     throw new TroveError(`${stem}.md already exists: pass a name`);
   const rel = folder ? `${folder}/${stem}.md` : `${stem}.md`;
-  const draft = await draftText(index, request);
+  const draft = await draftText(index, request, rel);
   const plan = supersede(
     index,
     {
@@ -153,6 +163,6 @@ export const newSummary = async (index: StoreIndex, request: SummaryRequest): Pr
 
 export const showSummary = async (index: StoreIndex, request: SummaryRequest): Promise<string> => {
   const rel = "SUMMARY.md";
-  const draft = await draftText(index, request);
+  const draft = await draftText(index, request, rel);
   return refreshGenerated(draft, rel, await withGitData(index, [{ rel, text: draft }]));
 };

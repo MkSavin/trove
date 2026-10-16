@@ -559,7 +559,7 @@ describe("item recheck", () => {
     const audit = await read(ready, "audits/AUDIT_WEB_1.md");
     expect(audit).toContain("| id | P | module | owner | status | what is left | checked |");
     expect(audit).toContain(`no "not sent" mark | ${head} |`);
-    expect(audit).toContain("on mid-range laptops |  |");
+    expect(audit).toContain("on mid-range laptops |\n");
     expect(driftOf(await reopen(ready), ["WEB1-1", "WEB1-2"])).toEqual([
       { id: "WEB1-1", drift: "false" },
       { id: "WEB1-2", drift: "file" },

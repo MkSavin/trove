@@ -3,6 +3,7 @@ import type { ReportColumn } from "../config/schema.ts";
 import { allLedgers } from "../config/vocabulary.ts";
 import type { Document } from "../document/document.ts";
 import type { Item } from "../document/ledger.ts";
+import { rebaseText } from "../edit/links.ts";
 import { type Drift, itemDrift } from "../index/drift.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { DRIFT, documentField, itemField } from "../index/query.ts";
@@ -53,7 +54,9 @@ const cellValue = (
   if (key === DOCUMENT_COLUMN)
     return documentCell(isDocument(row) ? row.rel : row.document, index, outputDir);
   if (key === DRIFT && !isDocument(row)) return driftCell(itemDrift(index, row));
-  return rowField(row, key, index);
+  const value = rowField(row, key, index);
+  const source = posix.dirname(isDocument(row) ? row.rel : row.document);
+  return value === undefined ? undefined : rebaseText(value, source, outputDir);
 };
 
 /** Cell text with links relative to the report file, so they work wherever it is opened. */

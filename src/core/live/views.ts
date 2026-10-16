@@ -125,7 +125,7 @@ const changes: View = (args, context) => {
   if (!before) return [EMPTY];
   const { since: _, ...rest } = args;
   const outputDir = posix.dirname(context.rel);
-  const rows = changeRows(context.index, before, outputDir).filter(
+  const rows = changeRows(context.index, before).filter(
     itemMatches(context.index, filtersOf(rest, context.base)),
   );
   if (rest.as === "counts") {

@@ -17,6 +17,14 @@ export const nameBase = (topic: string): string => {
   return base;
 };
 
+const MD = /\.md$/i;
+
+/** A given name gets the folder prefix unless it already starts with it; `.md` is dropped. */
+export const prefixedStem = (prefix: string, name: string): string => {
+  const stem = name.replace(MD, "");
+  return stem.startsWith(prefix) ? stem : `${prefix}${stem}`;
+};
+
 /** The first folder that takes the type; its prefix at the type's position. */
 export const placementOf = (config: Config, type: string): Placement => {
   const entry = Object.entries(config.folders).find(([, folder]) => folder.types.includes(type));
