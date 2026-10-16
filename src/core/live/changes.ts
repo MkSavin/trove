@@ -4,11 +4,11 @@ import type { Item } from "../document/ledger.ts";
 import { TroveError } from "../errors.ts";
 import { toplevel } from "../git/git.ts";
 import type { StoreIndex } from "../index/index.ts";
-import { documentCell } from "../reports/cells.ts";
+import { documentCell, type MovedItem } from "../reports/cells.ts";
 import { compareNatural } from "../text/compare.ts";
 import { baseOf, closedSince } from "./closed-after.ts";
 import type { BlockSource } from "./git-data.ts";
-import { currentRel, isLive } from "./item-state.ts";
+import { baseRel, currentRel, isLive } from "./item-state.ts";
 import { itemsAt } from "./items-at.ts";
 import { movedOut } from "./moved-out.ts";
 import { startOf } from "./since.ts";
@@ -86,11 +86,16 @@ type Row = {
   item: Item;
   from: string | undefined;
   to: string | undefined;
-  /** Where the item was at the start, when that was elsewhere. */
-  was: string | undefined;
+  /** Where a moved item went, when that is known. */
+  into: string | undefined;
+  /** Where the item is now, when it is counted elsewhere. */
+  current: string | undefined;
 };
 
-/** An item closed as moved counts as moved, shown where its new id lives when that is found. */
+/**
+ * Closed and moved items count in the document they were in at the start, else in the base of
+ * the companion they sit in; an item closed as moved counts as moved.
+ */
 const rowOf = (
   index: StoreIndex,
   before: Item | undefined,
@@ -106,27 +111,29 @@ const rowOf = (
     found === "closed" && before && from ? movedOut(index, before, after, from) : undefined;
   const change = moved ? "moved" : found;
   const target = moved?.to === undefined ? undefined : now.get(moved.to);
-  const document = currentRel(index, target?.document ?? item.document);
-  const closed = item.closed || found === "closed";
+  const current = currentRel(index, target?.document ?? item.document);
+  const document = change === "added" ? current : (from ?? baseRel(index, current));
+  const into = change === "moved" && (!moved || target) ? current : undefined;
   return {
     change,
-    item: { ...item, document, closed },
+    item: { ...item, document, closed: item.closed || found === "closed" },
     from: change === "moved" ? from : undefined,
     to: moved?.to,
-    was: from === document ? undefined : from,
+    into: into === document ? undefined : into,
+    current: current === document ? undefined : current,
   };
 };
 
 /**
  * Items closed, added and moved since the baseline, as items with a `change` value and, for
  * moves, `from` and, when the item took a new id, `to`; that new id is not listed as added.
- * An item passes `matches` as it is now or as it would be in the document it was in at the start.
+ * An item passes `matches` in the document it counts in or in the one it is in now.
  */
 export const changeRows = (
   index: StoreIndex,
   { before, closedSince: closed }: Baseline,
   matches: (item: Item) => boolean,
-): Item[] => {
+): (Item | MovedItem)[] => {
   const then = new Map((before ?? []).map((item) => [item.id, item]));
   const now = new Map(index.items.map((item) => [item.id, item]));
   const rows = [...new Set([...then.keys(), ...now.keys()])].flatMap((id) => {
@@ -140,7 +147,7 @@ export const changeRows = (
       (a, b) =>
         ORDER.indexOf(a.change) - ORDER.indexOf(b.change) || compareNatural(a.item.id, b.item.id),
     )
-    .flatMap(({ change, item, from, to, was }) => {
+    .flatMap(({ change, item, from, to, into, current }) => {
       const values = {
         ...item.values,
         change: index.config.labels[LABEL[change]],
@@ -149,7 +156,9 @@ export const changeRows = (
           : { from: documentCell(from, index, posix.dirname(item.document)) }),
         ...(to === undefined ? {} : { to }),
       };
-      const row = { ...item, values };
-      return matches(row) || (was !== undefined && matches({ ...row, document: was })) ? [row] : [];
+      const row = { ...item, values, ...(into === undefined ? {} : { movedTo: into }) };
+      return matches(row) || (current !== undefined && matches({ ...row, document: current }))
+        ? [row]
+        : [];
     });
 };

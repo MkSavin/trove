@@ -223,10 +223,10 @@ describe("changes", () => {
       [
         "| change | id | document | from |",
         "| ------ | -- | -------- | ---- |",
-        "| closed | API2-1 | [AUDIT_API_2.RESOLVED](../audits/AUDIT_API_2.RESOLVED.md) | — |",
+        "| closed | API2-1 | [AUDIT_API_2](../audits/AUDIT_API_2.md) | — |",
         "| added | API2-5 | [AUDIT_API_2](../audits/AUDIT_API_2.md) | — |",
-        "| moved | API2-3 | [AUDIT_MOBILE_1](../audits/mobile/AUDIT_MOBILE_1.md) | [AUDIT_API_2](../audits/AUDIT_API_2.md) |",
-        "| moved | API2-4 | [AUDIT_MOBILE_1](../audits/mobile/AUDIT_MOBILE_1.md) | [AUDIT_API_2](../audits/AUDIT_API_2.md) |",
+        "| moved | API2-3 | [AUDIT_API_2](../audits/AUDIT_API_2.md) → [AUDIT_MOBILE_1](../audits/mobile/AUDIT_MOBILE_1.md) | [AUDIT_API_2](../audits/AUDIT_API_2.md) |",
+        "| moved | API2-4 | [AUDIT_API_2](../audits/AUDIT_API_2.md) → [AUDIT_MOBILE_1](../audits/mobile/AUDIT_MOBILE_1.md) | [AUDIT_API_2](../audits/AUDIT_API_2.md) |",
         "<!-- /trove:changes -->",
       ].join("\n"),
     );
@@ -241,7 +241,7 @@ describe("changes", () => {
       block(`<!-- trove:changes since=${base} id=API2-3,MOB1-4 columns=change,id,to,document -->`),
     );
     expect(moved.text).toContain(
-      "| moved | API2-3 | MOB1-4 | [AUDIT_MOBILE_1](audits/mobile/AUDIT_MOBILE_1.md) |\n<!--",
+      "| moved | API2-3 | MOB1-4 | [AUDIT_API_2](audits/AUDIT_API_2.md) → [AUDIT_MOBILE_1](audits/mobile/AUDIT_MOBILE_1.md) |\n<!--",
     );
   });
 
@@ -272,11 +272,32 @@ describe("changes", () => {
       [
         "| audit | closed | added | moved |",
         "| ----- | ------ | ----- | ----- |",
-        "| [AUDIT_API_2.RESOLVED](audits/AUDIT_API_2.RESOLVED.md) | 1 | 0 | 0 |",
-        "| [AUDIT_API_2](audits/AUDIT_API_2.md) | 0 | 1 | 0 |",
-        "| [AUDIT_MOBILE_1](audits/mobile/AUDIT_MOBILE_1.md) | 0 | 0 | 2 |",
+        "| [AUDIT_API_2](audits/AUDIT_API_2.md) | 1 | 1 | 2 |",
+        "<!--",
       ].join("\n"),
     );
+  });
+
+  test("closed and moved items count where they were; moved ones say where they went", async () => {
+    const store = await open();
+    const list = await fill(
+      store.index,
+      block(
+        `<!-- trove:changes since=${base} group=document as=list format="{id} {change} {document}" -->`,
+      ),
+    );
+    expect(list.text).toContain(
+      [
+        "**[AUDIT_API_2](audits/AUDIT_API_2.md)**",
+        "",
+        "- API2-1 closed [AUDIT_API_2](audits/AUDIT_API_2.md)",
+        "- API2-5 added [AUDIT_API_2](audits/AUDIT_API_2.md)",
+        "- API2-3 moved [AUDIT_API_2](audits/AUDIT_API_2.md) → [AUDIT_MOBILE_1](audits/mobile/AUDIT_MOBILE_1.md)",
+        "- API2-4 moved [AUDIT_API_2](audits/AUDIT_API_2.md) → [AUDIT_MOBILE_1](audits/mobile/AUDIT_MOBILE_1.md)",
+        "<!--",
+      ].join("\n"),
+    );
+    expect(list.text).not.toContain("**[AUDIT_API_2.RESOLVED]");
   });
 
   test("counts grouped alone give a row per group; with by, a table per group", async () => {
@@ -289,9 +310,8 @@ describe("changes", () => {
       [
         "| document | closed | added | moved |",
         "| -------- | ------ | ----- | ----- |",
-        "| [AUDIT_API_2.RESOLVED](audits/AUDIT_API_2.RESOLVED.md) | 1 | 0 | 0 |",
-        "| [AUDIT_API_2](audits/AUDIT_API_2.md) | 0 | 1 | 0 |",
-        "| [AUDIT_MOBILE_1](audits/mobile/AUDIT_MOBILE_1.md) | 0 | 0 | 2 |",
+        "| [AUDIT_API_2](audits/AUDIT_API_2.md) | 1 | 1 | 2 |",
+        "<!--",
       ].join("\n"),
     );
     const perChange = await fill(
@@ -487,6 +507,11 @@ describe("changes", () => {
     );
     expect(changes.problems).toEqual([]);
     expect(changes.text).toContain("**closed**\n\nAPI2-1, API2-8, API2-10\n<!--");
+    const byDocument = await fill(
+      store.index,
+      block(`<!-- trove:changes since=2026-10-04 as=counts by=document -->`),
+    );
+    expect(byDocument.text).toContain("| [AUDIT_API_2](audits/AUDIT_API_2.md) | 3 |\n<!--");
     const trend = await fill(store.index, block("<!-- trove:trend weeks=1 -->"));
     expect(trend.problems).toEqual([]);
     expect(trend.text).toContain("| 2026-10-05 | 0 | 3 | 0 |");

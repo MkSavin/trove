@@ -412,6 +412,53 @@ describe("carrying a summary over", () => {
     expect(carried).toEndWith("## Later\n\n<!-- write: -->");
   });
 
+  test("text after a kept block goes to the place that moved below a new block", () => {
+    const template = [
+      "### Plans",
+      "",
+      "<!-- trove:documents type=plan -->",
+      "<!-- /trove:documents -->",
+      "",
+      "<!-- trove:progress -->",
+      "<!-- /trove:progress -->",
+      "",
+      "<!-- write: plan notes -->",
+      "",
+      "### Specs",
+      "",
+      "<!-- trove:documents type=spec -->",
+      "<!-- /trove:documents -->",
+      "",
+      "<!-- write: -->",
+      "",
+      "<!-- trove:progress -->",
+      "<!-- /trove:progress -->",
+      "",
+      "<!-- write: -->",
+    ].join("\n");
+    const previous = [
+      "### Plans",
+      "",
+      "<!-- trove:documents type=plan -->",
+      "- PLAN_ROLLOUT",
+      "<!-- /trove:documents -->",
+      "",
+      "Rollout first.",
+      "",
+      "### Specs",
+      "",
+      "<!-- trove:documents type=spec -->",
+      "<!-- /trove:documents -->",
+      "",
+      "Spec notes.",
+    ].join("\n");
+    const carried = carryWritten(template, previous);
+    expect(carried).toContain("<!-- write: plan notes -->\nRollout first.\n\n### Specs");
+    expect(carried).toContain("<!-- write: -->\nSpec notes.\n\n<!-- trove:progress -->");
+    expect(carried).toEndWith("<!-- /trove:progress -->\n\n<!-- write: -->");
+    expect(carried.match(/Spec notes\./g)).toHaveLength(1);
+  });
+
   test("a place counts as written once text sits under its label", () => {
     const lines = [
       "<!-- write: intro -->",

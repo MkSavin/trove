@@ -77,38 +77,54 @@ const writtenIn = (previous: string): Written => {
 const textOf = (lines: readonly string[] | undefined): string | undefined =>
   lines?.join("\n").trim() || undefined;
 
+/** How many write places of the template still wait for the text after each anchor. */
+const claimsOf = (placed: readonly Placed[]): Map<string, number> => {
+  const claims = new Map<string, number>();
+  for (const { line, anchor } of placed)
+    if (writeLabel(line) !== undefined) claims.set(anchor, (claims.get(anchor) ?? 0) + 1);
+  return claims;
+};
+
 /**
  * The template with each `<!-- write: … -->` place filled from the previous summary: the text under
- * the same label there, else after the same heading or block, else after its heading or after a
- * block of its section the template no longer has.
+ * the same label there, else after the same heading or block, else the nearest text of its section
+ * that no other write place of the template waits for.
  */
 export const carryWritten = (template: string, previous: string): string => {
   const written = writtenIn(previous);
   const placed = walk(template);
-  const kept = new Set(placed.map(({ anchor }) => anchor));
+  const claims = claimsOf(placed);
   const used = new Set<string>();
   const take = (key: string, lines: readonly string[] | undefined): string | undefined => {
     if (used.has(key)) return undefined;
     used.add(key);
     return textOf(lines);
   };
-  const fallback = (heading: string): string | undefined => {
-    const orphans = (written.bySection.get(heading) ?? []).filter((key) => !kept.has(key));
-    const key = [heading, ...orphans].find(
-      (candidate) => !used.has(candidate) && textOf(written.byAnchor.get(candidate)),
-    );
+  const isFree = (key: string): boolean =>
+    !used.has(key) && !claims.get(key) && textOf(written.byAnchor.get(key)) !== undefined;
+  const fallback = (heading: string, above: readonly string[]): string | undefined => {
+    const nearestFirst = [...above].reverse().concat(written.bySection.get(heading) ?? []);
+    const key = nearestFirst.find(isFree);
     return key === undefined ? undefined : take(key, written.byAnchor.get(key));
   };
   const out: string[] = [];
-  for (const { line, anchor, heading } of placed) {
+  let section: string | undefined;
+  let above: string[] = [];
+  for (const { line, anchor, heading, isAnchor } of placed) {
+    if (heading !== section) {
+      section = heading;
+      above = [];
+    }
+    if (isAnchor) above.push(anchor);
     out.push(line);
     const label = writeLabel(line);
     if (label === undefined) continue;
+    claims.set(anchor, (claims.get(anchor) ?? 1) - 1);
     const carried =
       take(`label\0${label}`, written.byLabel.get(label)) ??
       (written.byAnchor.has(anchor)
         ? take(anchor, written.byAnchor.get(anchor))
-        : fallback(heading));
+        : fallback(heading, above));
     if (carried !== undefined) out.push(carried);
   }
   return out.join("\n").replace(EXTRA_BLANKS, "\n\n");

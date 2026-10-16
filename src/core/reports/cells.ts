@@ -8,7 +8,10 @@ import { type Drift, itemDrift } from "../index/drift.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { DRIFT, documentField, itemField } from "../index/query.ts";
 
-export type ReportRow = Document | Item;
+/** An item whose document cell names where it went after the document it is counted in. */
+export type MovedItem = Item & { movedTo: string };
+
+export type ReportRow = Document | Item | MovedItem;
 
 const EMPTY = "—";
 const UNCHECKED = "?";
@@ -51,8 +54,11 @@ const cellValue = (
   index: StoreIndex,
   outputDir: string,
 ): string | undefined => {
-  if (key === DOCUMENT_COLUMN)
-    return documentCell(isDocument(row) ? row.rel : row.document, index, outputDir);
+  if (key === DOCUMENT_COLUMN) {
+    if (isDocument(row)) return documentCell(row.rel, index, outputDir);
+    const cell = documentCell(row.document, index, outputDir);
+    return "movedTo" in row ? `${cell} → ${documentCell(row.movedTo, index, outputDir)}` : cell;
+  }
   if (key === DRIFT && !isDocument(row)) return driftCell(itemDrift(index, row));
   const value = rowField(row, key, index);
   const source = posix.dirname(isDocument(row) ? row.rel : row.document);
