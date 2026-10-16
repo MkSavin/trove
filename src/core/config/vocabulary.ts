@@ -18,14 +18,17 @@ export const typeConfig = (
 ): DocumentTypeConfig | undefined =>
   type !== undefined && Object.hasOwn(config.types, type) ? config.types[type] : undefined;
 
+export const VERIFY_COMMAND_FIELD = "verify-cmd";
+
 /**
- * Every document may carry `filter`, the base filter of its generated blocks, and `blocked_by` and
- * `until`: ids or documents it waits for, or that end its deferral.
+ * Every document may carry `filter`, the base filter of its generated blocks; `blocked_by` and
+ * `until`, the ids or documents it waits for or that end its deferral; and a command that re-checks it.
  */
 const BUILT_IN_FIELDS: Readonly<Record<string, FieldSpec>> = {
   filter: { required: false, format: "text" },
   blocked_by: { required: false, format: "text" },
   until: { required: false, format: "text" },
+  [VERIFY_COMMAND_FIELD]: { required: false, format: "text" },
 };
 
 /** Store-wide fields merged with the type's own; the type wins. */

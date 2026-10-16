@@ -24,6 +24,7 @@ export const withChanges = (index: StoreIndex, changes: readonly Change[]): Stor
       index.config,
       documents.toSorted((a, b) => compareText(a.rel, b.rel)),
       index.today,
+      index.verified,
     ),
     gitData: index.gitData,
   };

@@ -56,6 +56,18 @@ try {
   await trove(["item", "close", "WEBCLIENT1-2", "--archive"]);
   await trove(["doc", "new", "plan", "offline mode", "--scope", "web/"]);
   await trove(["check"]);
+  await trove([
+    "doc",
+    "set",
+    "PLAN_OFFLINE_MODE",
+    "verify-cmd",
+    'cd "{root:app}/web" && echo here',
+  ]);
+  await trove(["check", "--verify"]);
+  const verified = await trove(["query", "documents", "type=plan", "--columns", "name,verified"]);
+  if (!verified.includes("PLAN_OFFLINE_MODE.md  ok ")) throw new Error("verify left no result");
+  await trove(["doc", "set", "PLAN_OFFLINE_MODE", "verify-cmd", "cd {root:app}/gone"]);
+  await trove(["check", "--verify"], 1);
   const query = await trove(["query", "documents", "place=archive"]);
   if (!query.includes(".archive/audits/AUDIT_WEB_CLIENT_1.md"))
     throw new Error("audit not archived");

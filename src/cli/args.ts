@@ -34,6 +34,15 @@ export const parse = <const Options extends ParseArgsOptionsConfig>(
   }
 };
 
+export const positiveInteger = (flag: string, value: string | undefined): number | undefined => {
+  if (value === undefined) return undefined;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number <= 0) {
+    throw new TroveError(`--${flag} takes a whole number above zero: ${value}`);
+  }
+  return number;
+};
+
 /** `owner=web what="a, b"` → `{ owner: "web", what: "a, b" }`. */
 export const parsePairs = (pairs: readonly string[]): Record<string, string> =>
   Object.fromEntries(

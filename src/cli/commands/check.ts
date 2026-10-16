@@ -4,11 +4,13 @@ import type { Diagnostic } from "../../core/rules/diagnostic.ts";
 import { runRules, unknownRuleIds } from "../../core/rules/run.ts";
 import type { Store } from "../../core/store/open.ts";
 import { relativePath } from "../../core/store/paths.ts";
-import { parse, STORE_OPTIONS } from "../args.ts";
+import { isFailure, type VerifyResult, verifyDocuments } from "../../core/verify/run.ts";
+import { parse, positiveInteger, STORE_OPTIONS } from "../args.ts";
 import { type Command, EXIT } from "../command.ts";
 import { countSeverities, formatCounts, formatDiagnostics } from "../format/diagnostics.ts";
 import { painter } from "../format/style.ts";
 import { formatTable } from "../format/table.ts";
+import { formatVerify } from "../format/verify.ts";
 import type { Io } from "../io.ts";
 import { openFromFlags } from "../store.ts";
 
@@ -41,6 +43,7 @@ const summary = (store: Store): string => {
 const printResult = (
   store: Store,
   diagnostics: readonly Diagnostic[],
+  verified: readonly VerifyResult[] | undefined,
   all: boolean,
   io: Io,
 ): void => {
@@ -54,17 +57,24 @@ const printResult = (
   const counts = countSeverities(diagnostics);
   const mark = counts.error > 0 ? paint("red", "✖") : paint("green", "✔");
   io.print(`${mark} ${formatCounts(counts)} · ${summary(store)}`);
+  if (verified) {
+    io.print();
+    for (const line of formatVerify(verified, paint)) io.print(line);
+  }
 };
 
 export const check: Command = {
   name: "check",
   summary: "Check headers, ledgers and placement of every document",
-  usage: "trove check [file] [--all] [--json]",
+  usage: "trove check [file] [--all] [--json] [--verify [--jobs N] [--timeout SECONDS]]",
   run: async (argv, io) => {
     const { values, positionals } = parse(argv, {
       ...STORE_OPTIONS,
       all: { type: "boolean", default: false },
       json: { type: "boolean", default: false },
+      verify: { type: "boolean", default: false },
+      jobs: { type: "string" },
+      timeout: { type: "string" },
     });
     const store = await openFromFlags(values, io);
     const [file] = positionals;
@@ -74,11 +84,21 @@ export const check: Command = {
       (diagnostic) => only === undefined || diagnostic.file === only,
     );
 
+    const timeout = positiveInteger("timeout", values.timeout);
+    const verified = values.verify
+      ? await verifyDocuments(store.index, {
+          only,
+          jobs: positiveInteger("jobs", values.jobs),
+          timeoutMs: timeout === undefined ? undefined : timeout * 1000,
+        })
+      : undefined;
+
     if (values.json) {
-      io.print(JSON.stringify({ summary: summary(store), diagnostics }, null, 2));
+      io.print(JSON.stringify({ summary: summary(store), diagnostics, verify: verified }, null, 2));
     } else {
-      printResult(store, diagnostics, values.all, io);
+      printResult(store, diagnostics, verified, values.all, io);
     }
-    return countSeverities(diagnostics).error > 0 ? EXIT.failed : EXIT.ok;
+    const failed = countSeverities(diagnostics).error > 0 || (verified?.some(isFailure) ?? false);
+    return failed ? EXIT.failed : EXIT.ok;
   },
 };
