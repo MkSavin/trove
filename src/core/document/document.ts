@@ -16,6 +16,7 @@ import { type Place, placeOf } from "../store/paths.ts";
 import { type Line, splitLines } from "../text/lines.ts";
 import { type Ledger, readLedger } from "./ledger.ts";
 import { PROMPT_MARKER, type PromptBody, readPrompt } from "./prompt.ts";
+import { readStages, type Stage } from "./stages.ts";
 import { readStatusLine, type StatusLine } from "./status-line.ts";
 
 export type Document = {
@@ -39,6 +40,8 @@ export type Document = {
   /** Present only for types with the matching capability and a marker in the text; closed items for `resolved-of`. */
   ledger: Ledger | undefined;
   prompt: PromptBody | undefined;
+  /** Empty unless the type has `stages` and the body a task list or a stage table. */
+  stages: readonly Stage[];
 };
 
 export type Source = { path: string; rel: string; text: string };
@@ -85,6 +88,9 @@ export const parseDocument = ({ path, rel, text }: Source, config: Config): Docu
         ? readLedger(ledgerBlocks, rel, ledgerConfig, headings, hasCapability(kind, "resolved-of"))
         : undefined,
     prompt: promptBlock ? readPrompt(promptBlock, text) : undefined,
+    stages: hasCapability(kind, "stages")
+      ? readStages(body, fenced, ledgerBlocks, config.stages)
+      : [],
   };
 };
 
