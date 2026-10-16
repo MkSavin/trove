@@ -6,9 +6,7 @@ export type Context = { cwd: string };
 export const storeField = z
   .string()
   .optional()
-  .describe(
-    "Store name from the project's .trove.yaml, or a folder; omit when the project has one",
-  );
+  .describe("Store name from the project's pointer, or a folder; omit when the project has one");
 
 export const filtersField = z.record(z.string(), z.union([z.string(), z.array(z.string())]));
 

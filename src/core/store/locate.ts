@@ -2,10 +2,12 @@ import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { CONFIG_FILE } from "../config/load.ts";
 import { TroveError } from "../errors.ts";
+import { toplevel } from "../git/git.ts";
 import { isInside, realPath } from "../text/real-path.ts";
 import { toPosix } from "./paths.ts";
 import { entryRoot, POINTER_FILE, readPointer } from "./pointer.ts";
 import { readRegistry } from "./registry.ts";
+import { siblingStores } from "./siblings.ts";
 
 type Candidate = { name: string; root: string; scope?: readonly string[] | undefined };
 
@@ -56,9 +58,12 @@ const fromRegistry = async (cwd: string): Promise<string | undefined> => {
   return pick(candidates, toPosix(relative(realPath(project.root), realPath(cwd))));
 };
 
-/** `--store` (a store name, else a path), a store folder above `cwd`, `.trove.yaml`, the registry. */
+/**
+ * `--store` (a store name, else a path), a store folder above `cwd`, the project's pointer
+ * (`.trove.yaml`, else `.git/trove.yaml`), the registry, then a store next to the project that names it.
+ */
 export const locateStore = async (cwd: string, store?: string): Promise<string | undefined> => {
-  const projectRoot = findUp(cwd, POINTER_FILE);
+  const projectRoot = findUp(cwd, POINTER_FILE) ?? (await toplevel(cwd));
   const candidates = projectRoot ? await projectCandidates(projectRoot) : [];
   if (store !== undefined) {
     const named = candidates.find((candidate) => candidate.name === store);
@@ -66,8 +71,10 @@ export const locateStore = async (cwd: string, store?: string): Promise<string |
   }
   const inStore = findUp(cwd, CONFIG_FILE);
   if (inStore) return inStore;
-  if (projectRoot && candidates.length > 0) {
-    return pick(candidates, toPosix(relative(realPath(projectRoot), realPath(cwd))));
-  }
-  return fromRegistry(cwd);
+  const rel = (root: string) => toPosix(relative(realPath(root), realPath(cwd)));
+  if (projectRoot && candidates.length > 0) return pick(candidates, rel(projectRoot));
+  const registered = await fromRegistry(cwd);
+  if (registered || !projectRoot) return registered;
+  const siblings = await siblingStores(projectRoot);
+  return siblings.length > 0 ? pick(siblings, rel(projectRoot)) : undefined;
 };

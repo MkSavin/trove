@@ -5,6 +5,12 @@ import { type Command, EXIT } from "../command.ts";
 import { type Paint, painter } from "../format/style.ts";
 import { formatTable } from "../format/table.ts";
 
+const POINTER_LABEL = {
+  shared: ".trove.yaml, shared with the project",
+  private: ".git/trove.yaml, this clone only",
+  none: "none",
+} as const;
+
 const yesNo = (value: boolean, paint: Paint): string =>
   value ? paint("green", "yes") : paint("yellow", "no");
 
@@ -49,7 +55,7 @@ export const doctor: Command = {
     const paint = painter(io);
     const rows = [
       ["project", health.project],
-      [".trove.yaml", yesNo(health.pointer, paint)],
+      ["pointer", POINTER_LABEL[health.pointer ?? "none"]],
       ["registered", yesNo(health.registered, paint)],
       ...health.stores.flatMap((store) => storeRows(store, paint)),
     ];

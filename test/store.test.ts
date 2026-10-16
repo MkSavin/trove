@@ -4,7 +4,7 @@ import { cp, mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git, toplevel } from "../src/core/git/git.ts";
-import { cloneStores } from "../src/core/store/clone.ts";
+import { cloneStore, cloneStores } from "../src/core/store/clone.ts";
 import { diagnose } from "../src/core/store/doctor.ts";
 import { initStore } from "../src/core/store/init.ts";
 import { locateStore } from "../src/core/store/locate.ts";
@@ -47,7 +47,12 @@ describe("init", () => {
 
     expect(result.store).toBe(join(workspace, "app-trove"));
     expect(result.committed).toBe(true);
-    expect(await readPointer(app)).toEqual({ stores: [{ name: "main", path: "../app-trove" }] });
+    expect(await readPointer(app)).toMatchObject({
+      place: "private",
+      stores: [{ name: "main", path: "../app-trove" }],
+    });
+    expect(existsSync(join(app, ".trove.yaml"))).toBe(false);
+    expect((await git(app, ["status", "--porcelain"])).out).toBe("");
     expect((await findProject(app))?.stores).toEqual([{ name: "main", path: result.store }]);
     expect(existsSync(join(result.store, ".git", "hooks", "pre-commit"))).toBe(true);
     expect((await git(result.store, ["log", "--format=%s"])).out).toBe("trove: init store");
@@ -66,8 +71,15 @@ describe("init", () => {
     expect(existsSync(join(result.store, ".git"))).toBe(false);
     expect(await Bun.file(join(result.store, "trove.yaml")).text()).toContain("language: ru");
     await expect(initStore({ cwd: app, language: "en" })).rejects.toThrow(
-      /already has .trove.yaml/,
+      /already has .*trove\.yaml/,
     );
+  });
+
+  test("--share writes the committed pointer for teammates", async () => {
+    const app = await project("app");
+    await initStore({ cwd: app, language: "en", git: false, share: true });
+    expect(await readPointer(app)).toMatchObject({ place: "shared" });
+    expect(await Bun.file(join(app, ".trove.yaml")).text()).toContain("path: ../app-trove");
   });
 
   test("a remote turns sync on and becomes origin", async () => {
@@ -106,16 +118,31 @@ describe("locating a store", () => {
   test("from the registry when the project has no pointer", async () => {
     const app = await project("app");
     const { store } = await initStore({ cwd: app, language: "en", git: false });
-    await rm(join(app, ".trove.yaml"));
+    await rm(join(app, ".git", "trove.yaml"));
     expect(await locateStore(app)).toBe(store);
     expect(await forgetProject(app)).toBe(true);
+    await rm(join(store, "trove.yaml"));
     expect(await locateStore(app)).toBeUndefined();
+  });
+
+  test("a store next to the project whose roots name it, with no pointer and no registry", async () => {
+    const app = await project("app");
+    const { store } = await initStore({ cwd: app, language: "en", git: false });
+    await rm(join(app, ".git", "trove.yaml"));
+    await forgetProject(app);
+    await mkdir(join(workspace, "unrelated-trove"), { recursive: true });
+    await Bun.write(
+      join(workspace, "unrelated-trove", "trove.yaml"),
+      "roots: { other: ../other }\n",
+    );
+    expect(await locateStore(join(app))).toBe(store);
+    expect((await diagnose(app)).stores.map((entry) => entry.root)).toEqual([store]);
   });
 
   test("doctor inside a store finds it and the project the registry ties it to", async () => {
     const app = await project("app");
     const { store } = await initStore({ cwd: app, language: "en", git: false });
-    await rm(join(app, ".trove.yaml"));
+    await rm(join(app, ".git", "trove.yaml"));
     const health = await diagnose(join(store, "audits"));
     expect(samePath(health.project, app)).toBe(true);
     expect(health.registered).toBe(true);
@@ -130,6 +157,26 @@ describe("locating a store", () => {
 });
 
 describe("clone", () => {
+  test("by the store's address, linked privately next to the project", async () => {
+    const app = await project("app");
+    const origin = await initStore({ cwd: app, language: "en" });
+    const colleague = join(workspace, "colleague", "app");
+    await mkdir(colleague, { recursive: true });
+    await git(colleague, ["init", "--quiet"]);
+    process.env.TROVE_HOME = join(workspace, "home3");
+
+    const remote = origin.store.replaceAll("\\", "/");
+    expect(await cloneStore({ cwd: colleague, remote })).toMatchObject({ action: "cloned" });
+    const cloned = join(workspace, "colleague", "app-trove");
+    expect(existsSync(join(cloned, "trove.yaml"))).toBe(true);
+    expect(existsSync(join(colleague, ".trove.yaml"))).toBe(false);
+    expect(await readPointer(colleague)).toMatchObject({
+      place: "private",
+      stores: [{ name: "main", path: "../app-trove", remote }],
+    });
+    expect(samePath((await locateStore(colleague)) ?? "", cloned)).toBe(true);
+  });
+
   test("brings the stores of a pointer onto another machine", async () => {
     const app = await project("app");
     const origin = await initStore({ cwd: app, language: "en" });

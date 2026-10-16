@@ -25,14 +25,20 @@ export const git = async (
   args: readonly string[],
   { raw = false, env }: GitOptions = {},
 ): Promise<GitResult> => {
-  const command = Bun.$`git ${args}`.cwd(cwd).quiet().nothrow();
-  const result = await command.env({ ...gitEnv(), ...env });
-  const out = result.stdout.toString();
-  return {
-    ok: result.exitCode === 0,
-    out: raw ? out : out.trim(),
-    err: result.stderr.toString().trim(),
-  };
+  // stdin stays closed: an MCP server over stdio reads its protocol from there.
+  const child = Bun.spawn(["git", ...args], {
+    cwd,
+    env: { ...gitEnv(), ...env },
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [out, err, code] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  return { ok: code === 0, out: raw ? out : out.trim(), err: err.trim() };
 };
 
 export const gitOrThrow = async (

@@ -27,7 +27,7 @@ export type MigrateOptions = {
   language?: Language | undefined;
   /** Files of the old tooling to leave behind, e.g. a hand-written checker. */
   drop?: readonly string[] | undefined;
-  /** Registers the store for this project folder; `link` also writes its `.trove.yaml`. */
+  /** Registers the store for this project folder and links it privately; `link` writes the shared `.trove.yaml`. */
   project?: string | undefined;
   link?: boolean | undefined;
   name?: string | undefined;
@@ -76,12 +76,14 @@ const linkProject = async (options: MigrateOptions, target: string): Promise<voi
   const project = resolve(options.cwd, options.project);
   const name = options.name ?? "main";
   await registerProject({ root: project, stores: [{ name, path: target }] });
-  if (!options.link) return;
   const pointer = await readPointer(project);
   const others = (pointer?.stores ?? []).filter((store) => store.name !== name);
-  await writePointer(project, {
-    stores: [...others, { name, path: toPosix(relative(project, target)) }],
-  });
+  const place = options.link ? "shared" : (pointer?.place ?? "private");
+  await writePointer(
+    project,
+    { stores: [...others, { name, path: toPosix(relative(project, target)) }] },
+    place,
+  );
 };
 
 const summary = (inventory: Inventory): string =>

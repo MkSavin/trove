@@ -24,12 +24,16 @@ export type InitOptions = {
   git?: boolean | undefined;
   /** Adds a store to a project that already has one, instead of refusing. */
   append?: boolean | undefined;
+  /** Writes the committed `.trove.yaml` for teammates; otherwise nothing shows in the project tree. */
+  share?: boolean | undefined;
 };
 
 export type InitResult = {
   project: string;
   store: string;
   entry: StoreEntry;
+  /** The pointer written; none when the project is not a git repository and not shared. */
+  pointer: string | undefined;
   committed: boolean;
   warnings: readonly string[];
 };
@@ -59,7 +63,7 @@ export const initStore = async (options: InitOptions): Promise<InitResult> => {
   const pointer = await readPointer(project);
   if (pointer && !options.append) {
     throw new TroveError(
-      "this project already has .trove.yaml: run trove clone, or trove store add",
+      `this project already has ${pointer.file}: run trove clone, or trove store add`,
     );
   }
 
@@ -89,7 +93,8 @@ export const initStore = async (options: InitOptions): Promise<InitResult> => {
     ...(options.scope?.length ? { scope: [...options.scope] } : {}),
   };
   const updated = withEntry(pointer, entry);
-  await writePointer(project, updated);
+  const place = options.share ? "shared" : (pointer?.place ?? "private");
+  const written = await writePointer(project, updated, place);
   await registerProject({
     root: project,
     stores: updated.stores.map((store) => ({
@@ -101,7 +106,13 @@ export const initStore = async (options: InitOptions): Promise<InitResult> => {
     project,
     store: root,
     entry,
+    pointer: written,
     committed: options.git !== false && warnings.length === 0,
-    warnings,
+    warnings: written
+      ? warnings
+      : [
+          ...warnings,
+          "the project is not a git repository: linked through this machine's registry only",
+        ],
   };
 };

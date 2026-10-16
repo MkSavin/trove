@@ -9,7 +9,8 @@ import { INIT_OPTIONS, printInit } from "./init.ts";
 const storeAdd: Command = {
   name: "add",
   summary: "Add another store to the project, for a team with its own access",
-  usage: "trove store add <name> [--scope GLOB]... [--path DIR] [--remote URL] [--lang en|ru]",
+  usage:
+    "trove store add <name> [--scope GLOB]... [--path DIR] [--remote URL] [--lang en|ru] [--share]",
   run: async (argv, io) => {
     const { values, positionals } = parse(argv, {
       ...INIT_OPTIONS,
@@ -30,6 +31,7 @@ const storeAdd: Command = {
       language,
       git: !values["no-git"],
       append: true,
+      share: values.share,
     });
     printInit(result, io);
     return EXIT.ok;

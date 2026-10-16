@@ -7,8 +7,9 @@ import { runRules } from "../rules/run.ts";
 import { isInside, samePath } from "../text/real-path.ts";
 import { findUp } from "./locate.ts";
 import { openStore } from "./open.ts";
-import { entryRoot, POINTER_FILE, readPointer } from "./pointer.ts";
+import { entryRoot, POINTER_FILE, type PointerPlace, readPointer } from "./pointer.ts";
 import { findProject, readRegistry } from "./registry.ts";
+import { siblingStores } from "./siblings.ts";
 
 export type StoreHealth = {
   name: string;
@@ -24,7 +25,8 @@ export type StoreHealth = {
 
 export type Health = {
   project: string;
-  pointer: boolean;
+  /** Where the project names its stores: `.trove.yaml`, `.git/trove.yaml`, or nowhere. */
+  pointer: PointerPlace | undefined;
   registered: boolean;
   stores: readonly StoreHealth[];
 };
@@ -69,7 +71,7 @@ const fromStore = async (store: string): Promise<Health> => {
   ];
   return {
     project: project?.root ?? store,
-    pointer: false,
+    pointer: undefined,
     registered: project !== undefined,
     stores: await Promise.all(entries.map((entry) => inspect(entry.name, entry.root))),
   };
@@ -85,10 +87,11 @@ export const diagnose = async (cwd: string): Promise<Health> => {
   const registered = await findProject(project);
   const entries = pointer
     ? pointer.stores.map((entry) => ({ name: entry.name, root: entryRoot(project, entry) }))
-    : (registered?.stores.map((store) => ({ name: store.name, root: store.path })) ?? []);
+    : (registered?.stores.map((store) => ({ name: store.name, root: store.path })) ??
+      (await siblingStores(project)));
   return {
     project,
-    pointer: pointer !== undefined,
+    pointer: pointer?.place,
     registered: registered !== undefined,
     stores: await Promise.all(entries.map((entry) => inspect(entry.name, entry.root))),
   };

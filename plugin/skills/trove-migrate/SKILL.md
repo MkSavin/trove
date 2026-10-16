@@ -16,7 +16,7 @@ The original archive is someone's working folder: only read it. Everything happe
    trove migrate <archive> <new-store> --drop <old-checker> --project <code-repo>
    ```
 
-   `--project` registers the store for the code repository on this machine; add `--link` only when the user agrees to a `.trove.yaml` in that repository. The new store is usually `../<project>-trove`.
+   `--project` links the store to the code repository on this machine, inside its `.git` folder, so nothing shows in the repository; add `--link` only when the user agrees to a `.trove.yaml` in that repository. The new store is usually `../<project>-trove`.
 3. **Read the report.** Every count must match; `✖` lines mean something was lost, stop and investigate. Notes list types, statuses and fields trove added to the config; decide with the user whether they are real or typos to fix.
 4. **Check.** `trove check` in the new store. Errors are real problems in the documents; fix them with trove operations, not by loosening rules. Turn a rule off or set `since:` only when the user decides old documents are exempt.
 5. **Point the instructions at trove.** The store's `AGENTS.md` and prompts may describe the old workflow: replace old commands with `trove` ones and old paths with the new folder. Leave archived documents and plans as they are; they are history. Commit with `trove sync`.

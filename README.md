@@ -39,13 +39,13 @@ Needs git. Take a single-file binary from [Releases](https://github.com/MkSavin/
 ```sh
 bun add -g github:MkSavin/trove    # or a binary from Releases
 cd ~/git/app                       # your project
-trove init                         # ../app-trove: a green store, linked and committed
+trove init                         # ../app-trove: a green store, linked and committed; nothing in the project tree
 trove doc new audit "web client" --scope web/
 trove item add AUDIT_WEB_CLIENT_1 priority=P1 owner=web "what=Offline sends are lost"
 trove item close WEBCLIENT1-1 --commit 3f2a9c1
 ```
 
-A teammate clones the project and runs `trove clone`: every store named in `.trove.yaml` is cloned next to it and registered. Already keep such an archive by hand? `trove migrate ../notes ../app-trove` builds a store from it: git history and uncommitted work come along, the config is fitted to the documents, and the archive itself is only read.
+A teammate runs `trove clone <store-url>` in their clone of the project: the store lands next to it and is linked, again with nothing in the project tree. With `trove init --share` the project instead commits `.trove.yaml`, and a plain `trove clone` brings every store it names. Already keep such an archive by hand? `trove migrate ../notes ../app-trove` builds a store from it: git history and uncommitted work come along, the config is fitted to the documents, and the archive itself is only read.
 
 ## Commands
 
@@ -53,10 +53,10 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 
 | command | does |
 | ------- | ---- |
-| `trove init [--path] [--remote] [--lang en\|ru] [--no-git]` | Create a store for the current project: folders, config, notes, reports, git with a pre-commit check, `.trove.yaml` in the project, an entry in `~/.trove/registry.yaml`. Asks at most three questions, each with a default; `--yes` takes them all. |
-| `trove clone` | Clone and register the stores named in the project's `.trove.yaml`. |
+| `trove init [--path] [--remote] [--lang en\|ru] [--share] [--no-git]` | Create a store for the current project: folders, config, notes, reports, git with a pre-commit check, a link in `.git/trove.yaml` (with `--share`, a committed `.trove.yaml`), an entry in `~/.trove/registry.yaml`. Asks at most three questions, each with a default; `--yes` takes them all. |
+| `trove clone [<store-url>] [--path] [--name] [--share]` | Clone a store by its address next to the project and link it privately; without an address, clone and register the stores the project's pointer names. |
 | `trove resync [--continue] [--seal]` | Bring what changed in the migrated-from archive since the last migration or resync, committed or not, three-way: the store's own edits stay, a document the store archived gets the change in the archive, a document the archive moved into its archive folder is moved in the store too, conflicts wait for `--continue`. The archive is only read, except with `--seal`. |
-| `trove migrate <archive> <store> [--drop FILE] [--project DIR [--link]]` | Build a store from an existing archive: clone with history, uncommitted work as its own commit, a config fitted to the documents (language, extra types, statuses and whether they are written as keys, fields, ledger columns per type, status lines only where documents have them, what the archive keeps, the old backlog's group order), rebuilt reports, a count of documents and items before and after. The archive is only read, and its remote is not carried over. |
+| `trove migrate <archive> <store> [--drop FILE] [--project DIR [--link]]` | Build a store from an existing archive: clone with history, uncommitted work as its own commit, a config fitted to the documents (language, extra types, statuses and whether they are written as keys, fields, ledger columns per type, status lines only where documents have them, what the archive keeps, the old backlog's group order), rebuilt reports, a count of documents and items before and after. The archive is only read, and its remote is not carried over. `--project` links the store to that project privately, `--link` through a committed `.trove.yaml`. |
 | `trove store add <name> --scope <glob>` | Another store for a team with its own access; commands run under `--scope` folders go to it. |
 | `trove remote add <url>` | Connect a local store to a remote repository, switch `sync` to `push` and push the history. |
 | `trove client add <claude\|cursor\|codex> [--local]` | Register the MCP server and the skills for an assistant in this project; `--local` keeps them on this machine and out of the project (Claude Code). |
@@ -93,7 +93,7 @@ A teammate clones the project and runs `trove clone`: every store named in `.tro
 
 **Filters** work the same in `query`, `summary`, `export`, report configs, generated blocks and MCP tools: `field=value` matches the raw text or the vocabulary key (`status=open` and `status=открыто` are the same), `~text` a substring, `*` and `**` a glob, and `!` in front excludes. Items also filter on their document's fields: `owner=web path=!audits/mobile/**` is everything for the web team outside the mobile audits. Repeat a field or use commas for alternatives. Closed items are left out unless a filter names `state` (`state=closed`, `state=open,closed`).
 
-Commands find their store from the current folder: inside a store, then through the project's `.trove.yaml` (by `scope` when there are several), then through the registry. `--store <name|dir>` or `$TROVE_STORE` overrides.
+Commands find their store from the current folder: inside a store, then through the project's pointer, `.trove.yaml` or `.git/trove.yaml` (by `scope` when there are several), then through the registry, then a store next to the project whose `roots` name it. `--store <name|dir>` or `$TROVE_STORE` overrides.
 
 **Sync.** `sync:` in `trove.yaml` decides what happens after an edit: `off` leaves git alone, `commit` makes one commit per operation (`docs: close WEB1-3`), `push` also pushes. When the remote moved on, trove rebases; conflicts in generated reports take the remote copy and are rebuilt, a conflict in a hand-written document stops with the file named and nothing pushed. Nothing is committed while `check` is red, nothing is ever force-pushed, and a store nested inside another repository never commits into it.
 
@@ -128,9 +128,9 @@ The skills, `trove-store` and `trove-migrate`, live once in [`plugin/skills`](pl
 
 ## Concepts
 
-**Project and store.** The project is your code repository. The store is a separate git repository of its documents, next to it by default. The project keeps one pointer file, `.trove.yaml`; the machine keeps `~/.trove/registry.yaml`. Access to a store is access to its repository.
+**Project and store.** The project is your code repository. The store is a separate git repository of its documents, next to it by default. Access to a store is access to its repository.
 
-`.trove.yaml` is optional once the project is in `~/.trove/registry.yaml`: commands find the store through the registry, so a shared repository that must not carry personal tools can leave the pointer uncommitted (list it in `.git/info/exclude`) or delete it. The limitation: `trove clone` reads the pointer, so without a committed `.trove.yaml` each teammate writes one locally and runs `trove clone`, or points at a hand-made clone with `--store` or `$TROVE_STORE`.
+By default trove leaves no trace in the project tree: the link lives in `.git/trove.yaml`, which git never shows or commits, and in `~/.trove/registry.yaml`; even without both, a store next to the project whose `roots` name it is found. Each teammate links their own clone with `trove clone <store-url>`. A team that wants the link in the repository uses `--share`, which writes `.trove.yaml` for a plain `trove clone`. Assistants follow the same rule: `trove client add claude --local` keeps their setup on this machine, and `trove init --client` does that unless the store is shared.
 
 **Archive.** Working folders sit next to an archive folder (`.archive/` by default) that mirrors them.
 
@@ -307,7 +307,7 @@ Both workflows also start by hand: **Actions → ci → Run workflow** on any br
 ## Roadmap
 
 - [x] **Read core.** Parser that keeps the original text, config schema, index, rules, reports; `check`, `report`, `query`, `show`, `prompt`.
-- [x] **Stores and edits.** `init`, `clone`, `migrate`, `store add`, per-machine registry, `.trove.yaml` pointer; `doc` and `item` edits that patch only their own lines.
+- [x] **Stores and edits.** `init`, `clone`, `migrate`, `store add`, per-machine registry, a private or shared pointer; `doc` and `item` edits that patch only their own lines.
 - [x] **Sync.** Commit per operation, push with rebase and rebuilt reports, `trove sync` for hand edits, `trove remote add`.
 - [x] **MCP.** One stdio server over the same operations, regulation generated from the config, several stores per project.
 - [x] **Clients.** Agent skills, a Claude Code plugin with hooks, `client add` for Cursor and Codex, single-file binaries on every release.

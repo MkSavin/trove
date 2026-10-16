@@ -27,6 +27,7 @@ export const INIT_OPTIONS = {
   "no-git": { type: "boolean", default: false },
   yes: { type: "boolean", short: "y", default: false },
   client: { type: "string", multiple: true },
+  share: { type: "boolean", default: false },
 } as const;
 
 type Answers = { path: string | undefined; remote: string | undefined; language: Language };
@@ -52,12 +53,19 @@ const askMissing = async (
   return { path, remote: remote === NONE ? undefined : remote, language: lang };
 };
 
+const pointerNote = ({ pointer }: InitResult): string => {
+  if (!pointer) return "none: this machine's registry only";
+  return pointer.endsWith(POINTER_FILE)
+    ? `${pointer}: commit it so teammates can run trove clone`
+    : `${pointer}: this clone only, nothing in the project tree`;
+};
+
 export const printInit = (result: InitResult, io: Io): void => {
   const paint = painter(io);
   io.print(paint("green", `✔ store ${result.entry.name} created at ${result.store}`));
   const rows = [
     ["project", result.project],
-    ["pointer", `${POINTER_FILE}: commit it so teammates can run trove clone`],
+    ["pointer", pointerNote(result)],
     ["registry", join(troveHome(), "registry.yaml")],
     ["git", result.committed ? "initial commit made, pre-commit runs trove check" : "no commit"],
     ["next", 'trove doc new audit "<topic>" --scope <folder>'],
@@ -70,7 +78,7 @@ export const init: Command = {
   name: "init",
   summary: "Create a store for the current project, link and register it",
   usage:
-    "trove init [--path DIR] [--remote URL] [--lang en|ru] [--client claude|cursor|codex]... [--no-git] [--yes]",
+    "trove init [--path DIR] [--remote URL] [--lang en|ru] [--share] [--client claude|cursor|codex]... [--no-git] [--yes]",
   run: async (argv, io) => {
     const { values } = parse(argv, INIT_OPTIONS);
     const answers = await askMissing(values, io);
@@ -79,9 +87,10 @@ export const init: Command = {
       ...answers,
       name: values.name,
       git: !values["no-git"],
+      share: values.share,
     });
     printInit(result, io);
-    await addClients(parseClients(values.client ?? []), io);
+    await addClients(parseClients(values.client ?? []), io, { local: !values.share });
     return EXIT.ok;
   },
 };

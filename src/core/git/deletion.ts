@@ -35,8 +35,17 @@ const onRemote = async (dir: string, commit: string): Promise<boolean> =>
 
 /** An SSH remote may name a `~/.ssh/config` alias; `ssh -G` tells the real host, without connecting. */
 const realHost = async (host: string): Promise<string | undefined> => {
-  const resolved = await Bun.$`ssh -G ${host}`.quiet().nothrow();
-  return resolved.exitCode === 0 ? HOSTNAME.exec(resolved.stdout.toString())?.[1] : undefined;
+  try {
+    const child = Bun.spawn(["ssh", "-G", host], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "ignore",
+    });
+    const [out, code] = await Promise.all([new Response(child.stdout).text(), child.exited]);
+    return code === 0 ? HOSTNAME.exec(out)?.[1] : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 const webOf = async (dir: string, commit: string): Promise<WebRepo | undefined> => {
