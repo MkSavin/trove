@@ -84,14 +84,31 @@ export const registerEditTools = (server: McpServer, context: Context): void => 
           .optional()
           .describe("A summary kind from the config; type is then ignored"),
         filters: filtersField.optional(),
+        from: z
+          .string()
+          .optional()
+          .describe(
+            "For a summary: latest, or a summary name, whose written analysis carries over",
+          ),
+        keep: z
+          .boolean()
+          .optional()
+          .describe("For a summary: leave the one it replaces in work instead of archiving it"),
         dryRun: dryRunField,
       }),
       annotations: EDIT,
     },
-    guarded(async ({ store, type, topic, name, fields, kind, filters, dryRun }) => {
+    guarded(async ({ store, type, topic, name, fields, kind, filters, from, keep, dryRun }) => {
       const opened = await openFor(context, store);
       const plan = kind
-        ? await newSummary(opened.index, { kind, title: topic, name, filters: asFilters(filters) })
+        ? await newSummary(opened.index, {
+            kind,
+            title: topic,
+            name,
+            filters: asFilters(filters),
+            from,
+            keep,
+          })
         : await newDocument(opened.index, { type, topic, name, fields });
       return runPlanTool(opened, plan, dryRun);
     }),
