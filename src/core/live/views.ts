@@ -7,7 +7,8 @@ import { placementTable } from "../regulation/regulation.ts";
 import { cellText, columnLabel, groupTitle, type ReportRow } from "../reports/cells.ts";
 import { groupRows, renderCounts, sortRows, tableLines } from "../reports/section.ts";
 import { branchesKey, branchesRoot, renderBranches } from "./branches.ts";
-import { changeRows, changesKey } from "./changes.ts";
+import { renderChangeCounts } from "./change-counts.ts";
+import { changeLabels, changeRows, changesKey } from "./changes.ts";
 import { loaded } from "./git-data.ts";
 
 /** Where a block lives and what it inherits: links are relative to it, filters add up. */
@@ -23,6 +24,8 @@ type Layout = {
   format: string;
   /** Labels of columns that are not ledger columns. */
   labels?: Readonly<Record<string, string>>;
+  /** Groups that come first, in this order, by the field grouped on. */
+  groupOrder?: Readonly<Record<string, readonly string[]>>;
 };
 
 const DEFAULTS = {
@@ -100,7 +103,8 @@ const grouped = (
   const sorted = sortRows(rows, list(args.sort ?? defaults.sort), context.index);
   if (!args.group) return layout(sorted, args, defaults, context);
   const dir = posix.dirname(context.rel);
-  return groupRows(sorted, { groupBy: args.group, groupOrder: [] }, context.index).flatMap(
+  const groupOrder = [...(defaults.groupOrder?.[args.group] ?? [])];
+  return groupRows(sorted, { groupBy: args.group, groupOrder }, context.index).flatMap(
     ({ name, members }, i) => [
       ...(i > 0 ? [""] : []),
       `**${groupTitle(name, args.group ?? "", dir) || EMPTY}**`,
@@ -119,17 +123,31 @@ const changes: View = (args, context) => {
   const before = baseline.value.before;
   if (!before) return [EMPTY];
   const { since: _, ...rest } = args;
-  const rows = changeRows(context.index, before, posix.dirname(context.rel)).filter(
+  const outputDir = posix.dirname(context.rel);
+  const rows = changeRows(context.index, before, outputDir).filter(
     itemMatches(context.index, filtersOf(rest, context.base)),
   );
-  const labels = { change: context.index.config.labels.change };
-  return grouped(rows, rest, { ...DEFAULTS.changes, labels }, context);
+  if (rest.as === "counts") {
+    if (rows.length === 0) return [EMPTY];
+    return renderChangeCounts(rows, context.index, { by: rest.by, label: rest.label, outputDir });
+  }
+  const config = context.index.config;
+  return grouped(
+    rows,
+    rest,
+    {
+      ...DEFAULTS.changes,
+      labels: { change: config.labels.change },
+      groupOrder: { change: changeLabels(config) },
+    },
+    context,
+  );
 };
 
 const branches: View = (args, context) => {
   branchesRoot(context.index.config, args);
   const table = loaded(context.index.gitData?.branches.get(branchesKey(args)));
-  return table && renderBranches(table.value, context.index.config);
+  return table && renderBranches(table.value, context.index.config, args.merged);
 };
 
 const VIEWS: Readonly<Record<string, View>> = {

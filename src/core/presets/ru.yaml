@@ -33,6 +33,9 @@ labels:
   summaryDocuments: Документы в работе
   branch: ветка
   lastCommit: последний коммит
+  ownCommits: свои
+  localAhead: локальная впереди
+  localDiverged: локальная разошлась
   change: изменение
   changeClosed: закрыт
   changeAdded: добавлен

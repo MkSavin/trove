@@ -1,6 +1,7 @@
 import { TroveError } from "../errors.ts";
 import { type Config, configSchema } from "./schema.ts";
 import { validateConfig } from "./validate.ts";
+import { withViewLabels } from "./view-labels.ts";
 
 export const CONFIG_FILE = "trove.yaml";
 
@@ -23,7 +24,7 @@ const ensureValid = (config: Config, origin: string): Config => {
 };
 
 export const parseConfig = (source: string, origin: string): Config => {
-  const parsed = configSchema.safeParse(readYaml(source, origin));
+  const parsed = configSchema.safeParse(withViewLabels(readYaml(source, origin)));
   if (!parsed.success) {
     throw invalid(
       origin,
