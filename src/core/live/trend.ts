@@ -5,6 +5,7 @@ import type { StoreIndex } from "../index/index.ts";
 import { columnLabel, groupTitle } from "../reports/cells.ts";
 import { tableLines } from "../reports/section.ts";
 import { compareNatural } from "../text/compare.ts";
+import { baseOf, closedSince } from "./closed-after.ts";
 import { isLive } from "./item-state.ts";
 import { itemsAt } from "./items-at.ts";
 import { commitBefore } from "./since.ts";
@@ -14,10 +15,14 @@ import { groupValue } from "./trend-group.ts";
 
 type Args = Readonly<Record<string, string>>;
 
-/** Each week's Monday and the items as they were when it began; none before the store existed. */
+/**
+ * Each week's Monday and the items as they were when it began; none before the store existed.
+ * `closedIn` holds, per week, the items absent at its start that provably closed in it.
+ */
 export type TrendHistory = {
   starts: readonly string[];
   snapshots: readonly (readonly Item[] | undefined)[];
+  closedIn: readonly ReadonlySet<string>[];
 };
 
 type TrendOptions = {
@@ -75,7 +80,15 @@ export const loadTrend = async (index: StoreIndex, args: Args): Promise<TrendHis
     return pending;
   };
   const snapshots = await Promise.all(commits.map((commit) => (commit ? read(commit) : undefined)));
-  return { starts, snapshots };
+  const closedIn = await Promise.all(
+    snapshots.map(async (before, i) => {
+      const commit = commits[i];
+      const after = i + 1 < snapshots.length ? snapshots[i + 1] : index.items;
+      if (!before || !after || !commit) return new Set<string>();
+      return closedSince(index, before, after, await baseOf(index.root, commit));
+    }),
+  );
+  return { starts, snapshots, closedIn };
 };
 
 /** Weeks the store existed by their end; ones wholly before it are left out. */
@@ -92,7 +105,7 @@ const weeksOf = (
     const open = after.filter((item) => isLive(item, index.config) && matches(item));
     const events =
       before &&
-      weekEvents(index, before, after).flatMap((event) => {
+      weekEvents(index, before, after, history.closedIn[i] ?? new Set()).flatMap((event) => {
         const item = eventSubject(event, matches);
         return item ? [{ kind: event.kind, item }] : [];
       });

@@ -144,7 +144,7 @@ const changes: View = (args, context) => {
   const config = context.index.config;
   const rows = changeRows(
     context.index,
-    before,
+    baseline.value,
     itemMatches(context.index, filtersOf(rest, context.base)),
   );
   const note = moved ? [baseNote(config, moved), ""] : [];

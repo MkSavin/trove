@@ -28,12 +28,14 @@ const leftAs = (
 
 /**
  * What happened between two snapshots. An item moved to a document of another name, or closed as
- * moved, counts once as moved; its new id is not counted as opened.
+ * moved, counts once as moved; its new id is not counted as opened. Of the items absent before,
+ * only those in `closedLater` count as closed.
  */
 export const weekEvents = (
   index: StoreIndex,
   before: readonly Item[],
   after: readonly Item[],
+  closedLater: ReadonlySet<string>,
 ): TrendEvent[] => {
   const live = (item: Item) => isLive(item, index.config);
   const then = new Map(before.filter(live).map((item) => [item.id, item]));
@@ -46,7 +48,10 @@ export const weekEvents = (
   const opened = after
     .filter((item) => live(item) && !then.has(item.id) && !targets.has(item.id))
     .map((item): TrendEvent => ({ kind: "opened", item, target: undefined }));
-  return [...left, ...opened];
+  const closed = after
+    .filter((item) => closedLater.has(item.id))
+    .map((item): TrendEvent => ({ kind: "closed", item, target: undefined }));
+  return [...left, ...opened, ...closed];
 };
 
 /** The item an event counts as under the filters: where it was, else where it went. */

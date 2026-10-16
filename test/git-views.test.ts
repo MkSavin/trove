@@ -448,6 +448,50 @@ describe("changes", () => {
     );
   });
 
+  test("an item absent at the start counts as closed only when its note proves it closed later", async () => {
+    const repo = join(workspace, "late-rows");
+    await copySandbox("harbor: ../harbor", repo);
+    await git(repo, ["init", "--quiet", "--initial-branch=main"]);
+    await git(repo, ["add", "--all"]);
+    await commitOn(repo, "docs: base", "2026-10-03");
+    const early = (await git(repo, ["rev-parse", "--short=7", "HEAD"])).out;
+    const closing = await openStore({ cwd: repo, store: repo, today: "2026-10-06" });
+    await applyPlan(closing, await closeItem(closing.index, "API2-1"));
+    await git(repo, ["add", "--all"]);
+    await commitOn(repo, "docs: close API2-1", "2026-10-06");
+    const later = (await git(repo, ["rev-parse", "--short=7", "HEAD"])).out;
+    const companion = Bun.file(join(repo, "audits/AUDIT_API_2.RESOLVED.md"));
+    const text = await companion.text();
+    const row = text.split("\n").find((line) => line.startsWith("| API2-1 |")) ?? "";
+    const late = (n: number, note?: string) => ({
+      row: row.replace("API2-1", `API2-${n}`),
+      section: note === undefined ? "" : `\n## API2-${n}. Found late (${note})\n\nWritten up.\n`,
+    });
+    const rows = [
+      late(7),
+      late(8, "fixed 2026-10-07"),
+      late(9, "fixed 2026-09-01"),
+      late(10, `fixed, ${later}`),
+      late(11, `fixed, ${early}`),
+    ];
+    await Bun.write(
+      companion,
+      `${text.replace(row, [row, ...rows.map((r) => r.row)].join("\n")).trimEnd()}\n${rows.map((r) => r.section).join("")}`,
+    );
+    await git(repo, ["add", "--all"]);
+    await commitOn(repo, "docs: closed rows found late", "2026-10-08");
+    const store = await openStore({ cwd: repo, store: repo, today: "2026-10-09" });
+    const changes = await fill(
+      store.index,
+      block(`<!-- trove:changes since=2026-10-04 group=change as=ids -->`),
+    );
+    expect(changes.problems).toEqual([]);
+    expect(changes.text).toContain("**closed**\n\nAPI2-1, API2-8, API2-10\n<!--");
+    const trend = await fill(store.index, block("<!-- trove:trend weeks=1 -->"));
+    expect(trend.problems).toEqual([]);
+    expect(trend.text).toContain("| 2026-10-05 | 0 | 3 | 0 |");
+  });
+
   test("an unknown starting point or a summary without a kind is a block problem", async () => {
     const store = await open();
     const unknown = await fill(store.index, block("<!-- trove:changes since=nope -->"));
