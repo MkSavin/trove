@@ -3,7 +3,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { Document } from "../document/document.ts";
 import { resolveFrom } from "../edit/links.ts";
 import { gitEnv } from "../git/git.ts";
-import type { Link } from "../markdown/links.ts";
+import { type Link, type Pin, pinnedRef } from "../markdown/links.ts";
 import type { StoreIndex } from "./index.ts";
 
 export type LinkKind = "document" | "store" | "code" | "outside";
@@ -16,8 +16,8 @@ export type ResolvedLink = {
   target: string;
   kind: LinkKind;
   state: LinkState;
-  /** Commit that deleted the target; the link is checked at its parent. */
-  deletedIn?: string;
+  /** The commit the link is pinned to and checked at. */
+  pin?: Pin;
 };
 
 const decode = (path: string): string => {
@@ -77,10 +77,10 @@ const codeState = (
   index: StoreIndex,
   root: CodeRoot,
   absolute: string,
-  deletedIn: string | undefined,
+  pin: Pin | undefined,
 ): LinkState => {
   if (!existsSync(root.dir)) return "unchecked";
-  if (deletedIn) return stateAt(index, root, absolute, `${deletedIn}^`);
+  if (pin) return stateAt(index, root, absolute, pinnedRef(pin));
   if (!root.ref) return existsSync(absolute) ? "ok" : "dead";
   return stateAt(index, root, absolute, root.ref);
 };
@@ -88,7 +88,7 @@ const codeState = (
 const classify = (
   index: StoreIndex,
   target: string,
-  deletedIn: string | undefined,
+  pin: Pin | undefined,
 ): Pick<ResolvedLink, "kind" | "state"> => {
   const absolute = resolve(index.root, target);
   if (!target.startsWith("../")) {
@@ -97,18 +97,18 @@ const classify = (
   }
   const root = codeRoot(index, absolute);
   if (!root) return { kind: "outside", state: "unchecked" };
-  return { kind: "code", state: codeState(index, root, absolute, deletedIn) };
+  return { kind: "code", state: codeState(index, root, absolute, pin) };
 };
 
 export const resolveLink = (index: StoreIndex, doc: Document, link: Link): ResolvedLink => {
   const target = resolveFrom(doc.rel, decode(link.path));
-  const { deletedIn } = link;
+  const { pin } = link;
   return {
     file: doc.rel,
     line: link.line,
     target,
-    ...classify(index, target, deletedIn),
-    ...(deletedIn ? { deletedIn } : {}),
+    ...classify(index, target, pin),
+    ...(pin ? { pin } : {}),
   };
 };
 

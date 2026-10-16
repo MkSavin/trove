@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { run } from "../src/cli/run.ts";
 import { toCsv } from "../src/core/export/csv.ts";
-import { webRepo } from "../src/core/git/permalink.ts";
+import { sshHost, webRepo } from "../src/core/git/permalink.ts";
 import { resolveLinks } from "../src/core/index/links.ts";
 import { applyPlan } from "../src/core/ops/apply.ts";
 import { moveItem } from "../src/core/ops/item-move.ts";
@@ -172,7 +172,7 @@ describe("links --fix", () => {
     const plan = await pinDeadLinks(store.index, store.index.documents);
     expect(plan.notes).toContain(`audits/AUDIT_WEB_1.md:66 ${THREADS}: deleted in ${short}`);
     expect(plan.notes).toContain(
-      "audits/AUDIT_WEB_1.md:70 ../harbor/web/src/notifications/notify.ts: left as is, never in git history",
+      "audits/AUDIT_WEB_1.md:70 ../harbor/web/src/notifications/notify.ts: left as is, never in HEAD or any other branch",
     );
     expect((await applyPlan(store, plan)).introduced).toEqual([]);
     expect(await read(store, "audits/AUDIT_WEB_1.md")).toContain(
@@ -183,7 +183,7 @@ describe("links --fix", () => {
     const web = reopened.index.byRel.get("audits/AUDIT_WEB_1.md");
     if (!web) throw new Error("no web audit");
     const threads = resolveLinks(reopened.index, web).find((link) => link.target === THREADS);
-    expect(threads).toMatchObject({ state: "ok", deletedIn: short });
+    expect(threads).toMatchObject({ state: "ok", pin: { note: "deleted in", commit: short } });
     const dead = runRules(reopened.rules, reopened.index)
       .filter((d) => d.rule === "dead-link")
       .map((d) => d.message);
@@ -203,9 +203,11 @@ describe("links --fix", () => {
     const web = reopened.index.byRel.get(rel);
     if (!web) throw new Error("no web audit");
     const marked = resolveLinks(reopened.index, web).find((link) => link.target === notify);
-    expect(marked).toMatchObject({ state: "dead", deletedIn: short });
+    expect(marked).toMatchObject({ state: "dead", pin: { note: "deleted in", commit: short } });
     const plan = await pinDeadLinks(reopened.index, [web]);
-    expect(plan.notes).toContain(`${rel}:70 ${notify}: left as is, not in the parent of ${short}`);
+    expect(plan.notes).toContain(
+      `${rel}:70 ${notify}: left as is, not readable deleted in ${short}`,
+    );
   });
 
   test("a pushed commit on a GitHub origin becomes a permalink", async () => {
@@ -224,6 +226,49 @@ describe("links --fix", () => {
     expect(pushed.changes[0]?.text).toContain(
       `[threads.ts:120-151](https://github.com/acme/harbor/blob/${parent}/web/src/stores/threads.ts#L120-L151).`,
     );
+  });
+
+  test("a file only another branch has is pinned at that branch's last commit", async () => {
+    const store = await sandbox();
+    const gitIn = await harborRepo(store);
+    await gitIn("checkout", "-q", "-b", "side");
+    await mkdir(join(store.root, "..", "harbor", "web", "src", "notifications"), {
+      recursive: true,
+    });
+    await Bun.write(
+      join(store.root, "..", "harbor", "web", "src", "notifications", "notify.ts"),
+      "x\n",
+    );
+    await gitIn("add", "-A");
+    await gitIn("commit", "-qm", "side work");
+    const side = await gitIn("rev-parse", "--short", "HEAD");
+    await gitIn("checkout", "-q", "-");
+    await gitIn("branch", "-q", "-m", "side", "feature");
+
+    const web = store.index.byRel.get("audits/AUDIT_WEB_1.md");
+    if (!web) throw new Error("no web audit");
+    const plan = await pinDeadLinks(store.index, [web]);
+    expect(plan.notes).toContain(
+      `audits/AUDIT_WEB_1.md:70 ../harbor/web/src/notifications/notify.ts: at ${side} on feature`,
+    );
+    expect(plan.changes[0]?.text).toContain(`#L17) *(at ${side})*`);
+    expect((await applyPlan(store, plan)).introduced).toEqual([]);
+    const reopened = await reopen(store);
+    const pinned = resolveLinks(reopened.index, reopened.index.byRel.get(web.rel) ?? web).find(
+      (link) => link.target.endsWith("notify.ts"),
+    );
+    expect(pinned).toMatchObject({ state: "ok", pin: { note: "at", commit: side } });
+  });
+
+  test("an SSH alias takes the real host for the web link", () => {
+    expect(sshHost("git@work.github:acme/harbor.git")).toBe("work.github");
+    expect(sshHost("ssh://git@work.github/acme/harbor.git")).toBe("work.github");
+    expect(sshHost("https://github.com/acme/harbor.git")).toBeUndefined();
+    expect(sshHost("C:\\repos\\harbor")).toBeUndefined();
+    expect(webRepo("git@work.github:acme/harbor.git", "github.com")?.base).toBe(
+      "https://github.com/acme/harbor",
+    );
+    expect(webRepo("git@work.alias:acme/harbor.git", "git.example.com")).toBeUndefined();
   });
 
   test("web remotes of GitHub and GitLab, without credentials", () => {

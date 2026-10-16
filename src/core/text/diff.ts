@@ -1,10 +1,63 @@
 export type DiffLine = { kind: "-" | "+"; line: number; text: string };
 
-const MAX_CELLS = 4_000_000;
+/** Bounds the edit-script search: a diff past it is shown as one hunk. */
+const MAX_TRACE = 16_000_000;
 
 const splitText = (text: string): string[] => (text === "" ? [] : text.split(/\r?\n/));
 
-/** Changed lines only, numbered in the file they come from; large files fall back to one hunk. */
+/** Shortest edit script (Myers): cost grows with the number of changes, not the file size. */
+const editScript = (a: readonly string[], b: readonly string[]): DiffLine[] | undefined => {
+  const max = a.length + b.length;
+  const offset = max + 1;
+  const v = new Int32Array(2 * max + 3);
+  const trace: Int32Array[] = [];
+  for (let d = 0; d <= max; d++) {
+    if ((d + 1) * v.length > MAX_TRACE) return undefined;
+    trace.push(v.slice());
+    for (let k = -d; k <= d; k += 2) {
+      const down = k === -d || (k !== d && (v[offset + k - 1] ?? 0) < (v[offset + k + 1] ?? 0));
+      let x = down ? (v[offset + k + 1] ?? 0) : (v[offset + k - 1] ?? 0) + 1;
+      let y = x - k;
+      while (x < a.length && y < b.length && a[x] === b[y]) {
+        x++;
+        y++;
+      }
+      v[offset + k] = x;
+      if (x >= a.length && y >= b.length) return backtrack(trace, a, b, offset);
+    }
+  }
+  return undefined;
+};
+
+const backtrack = (
+  trace: readonly Int32Array[],
+  a: readonly string[],
+  b: readonly string[],
+  offset: number,
+): DiffLine[] => {
+  const out: DiffLine[] = [];
+  let x = a.length;
+  let y = b.length;
+  for (let d = trace.length - 1; d > 0; d--) {
+    const v = trace[d] as Int32Array;
+    const k = x - y;
+    const down = k === -d || (k !== d && (v[offset + k - 1] ?? 0) < (v[offset + k + 1] ?? 0));
+    const previousK = down ? k + 1 : k - 1;
+    const previousX = v[offset + previousK] ?? 0;
+    const previousY = previousX - previousK;
+    while (x > previousX && y > previousY) {
+      x--;
+      y--;
+    }
+    if (down) out.push({ kind: "+", line: y, text: b[y - 1] ?? "" });
+    else out.push({ kind: "-", line: x, text: a[x - 1] ?? "" });
+    x = previousX;
+    y = previousY;
+  }
+  return out.reverse();
+};
+
+/** Changed lines only, numbered in the file they come from; an unbounded diff falls back to one hunk. */
 export const lineDiff = (before: string, after: string): DiffLine[] => {
   const a = splitText(before);
   const b = splitText(after);
@@ -16,43 +69,12 @@ export const lineDiff = (before: string, after: string): DiffLine[] => {
   }
   const left = a.slice(head, a.length - tail);
   const right = b.slice(head, b.length - tail);
-  if (left.length * right.length > MAX_CELLS) {
+  const script = editScript(left, right);
+  if (!script) {
     return [
       ...left.map((text, i): DiffLine => ({ kind: "-", line: head + i + 1, text })),
       ...right.map((text, i): DiffLine => ({ kind: "+", line: head + i + 1, text })),
     ];
   }
-
-  const lcs = Array.from({ length: left.length + 1 }, () =>
-    new Array<number>(right.length + 1).fill(0),
-  );
-  for (let i = left.length - 1; i >= 0; i--) {
-    for (let j = right.length - 1; j >= 0; j--) {
-      const row = lcs[i] as number[];
-      row[j] =
-        left[i] === right[j]
-          ? (lcs[i + 1]?.[j + 1] ?? 0) + 1
-          : Math.max(lcs[i + 1]?.[j] ?? 0, row[j + 1] ?? 0);
-    }
-  }
-
-  const out: DiffLine[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < left.length || j < right.length) {
-    if (i < left.length && j < right.length && left[i] === right[j]) {
-      i++;
-      j++;
-    } else if (
-      i < left.length &&
-      (j === right.length || (lcs[i + 1]?.[j] ?? 0) >= (lcs[i]?.[j + 1] ?? 0))
-    ) {
-      out.push({ kind: "-", line: head + i + 1, text: left[i] ?? "" });
-      i++;
-    } else {
-      out.push({ kind: "+", line: head + j + 1, text: right[j] ?? "" });
-      j++;
-    }
-  }
-  return out;
+  return script.map((line) => ({ ...line, line: head + line.line }));
 };

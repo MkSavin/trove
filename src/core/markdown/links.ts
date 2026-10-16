@@ -9,18 +9,30 @@ export type Link = {
   end: number;
   /** Source offset just past the link, where a note after it goes. */
   after: number;
-  /** Commit named by a `*(deleted in <sha>)*` note right after the link. */
-  deletedIn: string | undefined;
+  /** A `*(deleted in <sha>)*` or `*(at <sha>)*` note right after the link. */
+  pin: Pin | undefined;
 };
+
+/** A commit where a linked file can still be read: `deleted in` reads its parent, `at` the commit. */
+export type Pin = { note: "deleted in" | "at"; commit: string };
 
 const LINK_TARGET = /\]\(([^)\s#]*)(#[^)\s]*)?(?=[)\s])/dg;
 const EXTERNAL = /^(?:[a-z][a-z\d+.-]*:|\/|<|$)/i;
-const DELETED_NOTE = /^ \*\(deleted in ([\da-f]{7,40})\)\*/;
+const PIN_NOTE = /^ \*\((deleted in|at) ([\da-f]{7,40})\)\*/;
 
 const CODE_SPAN = /(`+)[^`][\s\S]*?\1/g;
 
-/** Marks a link into code whose file is gone: it is checked at the parent of that commit. */
-export const deletedNote = (commit: string): string => ` *(deleted in ${commit})*`;
+export const pinNote = ({ note, commit }: Pin): string => ` *(${note} ${commit})*`;
+
+/** The commit a pinned link is checked at. */
+export const pinnedRef = ({ note, commit }: Pin): string => (note === "at" ? commit : `${commit}^`);
+
+const pinAfter = (rest: string): Pin | undefined => {
+  const match = PIN_NOTE.exec(rest);
+  return match?.[2]
+    ? { note: match[1] === "at" ? "at" : "deleted in", commit: match[2] }
+    : undefined;
+};
 
 const inCode = (text: string, at: number): boolean =>
   [...text.matchAll(CODE_SPAN)].some((span) => at > span.index && at < span.index + span[0].length);
@@ -47,7 +59,7 @@ export const findLinks = (lines: readonly Line[], fenced: ReadonlySet<number>): 
             start: line.start + at[0],
             end: line.start + at[1],
             after: line.start + after,
-            deletedIn: DELETED_NOTE.exec(line.text.slice(after))?.[1],
+            pin: pinAfter(line.text.slice(after)),
           },
         ];
       }),

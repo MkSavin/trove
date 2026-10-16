@@ -47,7 +47,7 @@ export const links: Command = {
         `${link.file}:${link.line}`,
         paint(STATE_STYLE[link.state], link.state),
         link.kind,
-        link.deletedIn ? `${link.target} (deleted in ${link.deletedIn})` : link.target,
+        link.pin ? `${link.target} (${link.pin.note} ${link.pin.commit})` : link.target,
       ]);
       for (const line of formatTable(rows)) io.print(line);
       io.print(

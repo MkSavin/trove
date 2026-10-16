@@ -5,6 +5,7 @@ import { parseFrontMatter } from "../src/core/markdown/front-matter.ts";
 import { parseHeadings } from "../src/core/markdown/headings.ts";
 import { findLinks } from "../src/core/markdown/links.ts";
 import { parseTables } from "../src/core/markdown/tables.ts";
+import { lineDiff } from "../src/core/text/diff.ts";
 import { splitLines } from "../src/core/text/lines.ts";
 
 describe("splitLines", () => {
@@ -78,5 +79,19 @@ describe("findLinks", () => {
   test("a link-like text inside inline code is not a link; code inside link text is", () => {
     const lines = splitLines("title `A](x) B` stays whole, [`f.ts:3`](src/f.ts#L3) links");
     expect(findLinks(lines, fencedLines(lines)).map((link) => link.path)).toEqual(["src/f.ts"]);
+  });
+});
+
+describe("lineDiff", () => {
+  test("a few changed lines in a long file stay a few lines", () => {
+    const before = Array.from({ length: 3000 }, (_, i) => `line ${i}`);
+    const after = before.map((line, i) => (i % 500 === 7 ? `${line} edited` : line));
+    const diff = lineDiff(`${before.join("\n")}\n`, `${after.join("\n")}\n`);
+    expect(diff).toHaveLength(12);
+    expect(diff.slice(0, 2)).toEqual([
+      { kind: "-", line: 8, text: "line 7" },
+      { kind: "+", line: 8, text: "line 7 edited" },
+    ]);
+    expect(diff.at(-1)).toEqual({ kind: "+", line: 2508, text: "line 2507 edited" });
   });
 });

@@ -21,14 +21,14 @@ const idle = (mode: Config["sync"], warnings: readonly string[] = []): SyncResul
   warnings,
 });
 
-const rebuildReports = async (root: string): Promise<string[]> => {
-  const store = await openStore({ cwd: root, store: root });
+const rebuildReports = async (root: string, today: string): Promise<string[]> => {
+  const store = await openStore({ cwd: root, store: root, today });
   const results = await writeReports(store.index, Object.keys(store.config.reports));
   return results.filter((result) => result.changed).map((result) => result.output);
 };
 
-const isGreen = async (root: string): Promise<boolean> => {
-  const store = await openStore({ cwd: root, store: root });
+const isGreen = async (root: string, today: string): Promise<boolean> => {
+  const store = await openStore({ cwd: root, store: root, today });
   return !hasErrors(runRules(store.rules, store.index));
 };
 
@@ -41,14 +41,17 @@ const record = async (
   if (!(await isRepositoryRoot(store.root))) {
     return idle(mode, ["the store is not the root of a git repository: not committed"]);
   }
-  if (!(await isGreen(store.root))) return idle(mode, ["check is red: not committed"]);
+  if (!(await isGreen(store.root, store.index.today)))
+    return idle(mode, ["check is red: not committed"]);
 
   const committed = await commitPaths(store.root, paths, message);
   if (committed.error) return idle(mode, [`not committed: ${committed.error}`]);
   if (mode !== "push" || !committed.sha) return { ...idle(mode), commit: committed.sha };
 
   const generated = Object.values(store.config.reports).map((report) => report.output);
-  const pushed = await pushWithRebase(store.root, generated, () => rebuildReports(store.root));
+  const pushed = await pushWithRebase(store.root, generated, () =>
+    rebuildReports(store.root, store.index.today),
+  );
   return {
     mode,
     commit: committed.sha,
@@ -72,8 +75,9 @@ export const syncStore = async (store: Store, message?: string): Promise<SyncRes
   if (store.config.sync === "off") {
     throw new TroveError("sync is off in trove.yaml: set it to commit or push");
   }
-  await rebuildReports(store.root);
-  if (!(await isGreen(store.root))) throw new TroveError("check is red: fix the errors, then sync");
+  await rebuildReports(store.root, store.index.today);
+  if (!(await isGreen(store.root, store.index.today)))
+    throw new TroveError("check is red: fix the errors, then sync");
   return record(store, "all", message ?? "docs: sync hand edits");
 };
 
@@ -81,7 +85,9 @@ export const syncStore = async (store: Store, message?: string): Promise<SyncRes
 export const pushStore = async (store: Store): Promise<SyncResult> => {
   if (store.config.sync !== "push") return idle(store.config.sync);
   const generated = Object.values(store.config.reports).map((report) => report.output);
-  const pushed = await pushWithRebase(store.root, generated, () => rebuildReports(store.root));
+  const pushed = await pushWithRebase(store.root, generated, () =>
+    rebuildReports(store.root, store.index.today),
+  );
   return {
     ...idle(store.config.sync, pushed.warning ? [pushed.warning] : []),
     pushed: pushed.pushed,
