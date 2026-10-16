@@ -279,6 +279,55 @@ describe("changes", () => {
     );
   });
 
+  test("counts grouped alone give a row per group; with by, a table per group", async () => {
+    const store = await open();
+    const perDocument = await fill(
+      store.index,
+      block(`<!-- trove:changes since=${base} as=counts group=document -->`),
+    );
+    expect(perDocument.text).toContain(
+      [
+        "| document | closed | added | moved |",
+        "| -------- | ------ | ----- | ----- |",
+        "| [AUDIT_API_2.RESOLVED](audits/AUDIT_API_2.RESOLVED.md) | 1 | 0 | 0 |",
+        "| [AUDIT_API_2](audits/AUDIT_API_2.md) | 0 | 1 | 0 |",
+        "| [AUDIT_MOBILE_1](audits/mobile/AUDIT_MOBILE_1.md) | 0 | 0 | 2 |",
+      ].join("\n"),
+    );
+    const perChange = await fill(
+      store.index,
+      block(`<!-- trove:changes since=${base} as=counts group=change by=owner -->`),
+    );
+    expect(perChange.text).toContain(
+      [
+        "**closed**",
+        "",
+        "| owner | closed |",
+        "| ----- | ------ |",
+        "| api | 1 |",
+        "",
+        "**added**",
+      ].join("\n"),
+    );
+    expect(perChange.text).toContain("**moved**\n\n| owner | moved |\n");
+  });
+
+  test("an item closed into a document of another type matches filters on where it was", async () => {
+    const store = await open();
+    const audits = await fill(
+      store.index,
+      block(`<!-- trove:changes since=${base} type=audit group=change as=ids -->`),
+    );
+    expect(audits.text).toContain(
+      "**closed**\n\nAPI2-1\n\n**added**\n\nAPI2-5\n\n**moved**\n\nAPI2-3, API2-4\n",
+    );
+    const resolved = await fill(
+      store.index,
+      block(`<!-- trove:changes since=${base} type=resolved as=ids -->`),
+    );
+    expect(resolved.text).toContain("-->\nAPI2-1\n<!--");
+  });
+
   test("previous is the summary dated before, not one written the same day", async () => {
     await git(root, ["add", "--all"]);
     await commitOn(root, "docs: first summary", "2026-10-20");

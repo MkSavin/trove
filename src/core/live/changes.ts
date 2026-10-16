@@ -69,7 +69,14 @@ export const baseNote = (config: Config, moved: MovedBase): string =>
     .replaceAll("{date}", moved.date)
     .replaceAll("{since}", moved.on);
 
-type Row = { change: Change; item: Item; from: string | undefined; to: string | undefined };
+type Row = {
+  change: Change;
+  item: Item;
+  from: string | undefined;
+  to: string | undefined;
+  /** Where the item was at the start, when that was elsewhere. */
+  was: string | undefined;
+};
 
 /** An item closed as moved counts as moved, shown where its new id lives when that is found. */
 const rowOf = (
@@ -93,14 +100,20 @@ const rowOf = (
     item: { ...item, document, closed },
     from: change === "moved" ? from : undefined,
     to: moved?.to,
+    was: from === document ? undefined : from,
   };
 };
 
 /**
  * Items closed, added and moved since the baseline, as items with a `change` value and, for
  * moves, `from` and, when the item took a new id, `to`; that new id is not listed as added.
+ * An item passes `matches` as it is now or as it would be in the document it was in at the start.
  */
-export const changeRows = (index: StoreIndex, baseline: readonly Item[]): Item[] => {
+export const changeRows = (
+  index: StoreIndex,
+  baseline: readonly Item[],
+  matches: (item: Item) => boolean,
+): Item[] => {
   const then = new Map(baseline.map((item) => [item.id, item]));
   const now = new Map(index.items.map((item) => [item.id, item]));
   const rows = [...new Set([...then.keys(), ...now.keys()])].flatMap((id) => {
@@ -114,7 +127,7 @@ export const changeRows = (index: StoreIndex, baseline: readonly Item[]): Item[]
       (a, b) =>
         ORDER.indexOf(a.change) - ORDER.indexOf(b.change) || compareNatural(a.item.id, b.item.id),
     )
-    .map(({ change, item, from, to }) => {
+    .flatMap(({ change, item, from, to, was }) => {
       const values = {
         ...item.values,
         change: index.config.labels[LABEL[change]],
@@ -123,6 +136,7 @@ export const changeRows = (index: StoreIndex, baseline: readonly Item[]): Item[]
           : { from: documentCell(from, index, posix.dirname(item.document)) }),
         ...(to === undefined ? {} : { to }),
       };
-      return { ...item, values };
+      const row = { ...item, values };
+      return matches(row) || (was !== undefined && matches({ ...row, document: was })) ? [row] : [];
     });
 };

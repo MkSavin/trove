@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import type { Item } from "../document/ledger.ts";
 import { TroveError } from "../errors.ts";
 import { mergeFilters } from "../index/filters.ts";
 import type { StoreIndex } from "../index/index.ts";
@@ -95,25 +96,40 @@ const layout = (
   }
 };
 
+/** With `group`, a bold title per group above what `render` makes of its rows. */
+const sections = <Row extends ReportRow>(
+  rows: Row[],
+  args: Readonly<Record<string, string>>,
+  defaults: Pick<Layout, "groupOrder">,
+  context: ViewContext,
+  render: (members: Row[]) => string[],
+): string[] => {
+  if (!args.group) return render(rows);
+  const dir = posix.dirname(context.rel);
+  const groupOrder = [...(defaults.groupOrder?.[args.group] ?? [])];
+  return groupRows(rows, { groupBy: args.group, groupOrder }, context.index).flatMap(
+    ({ name, members }, i) => [
+      ...(i > 0 ? [""] : []),
+      `**${groupTitle(name, args.group ?? "", dir) || EMPTY}**`,
+      "",
+      ...render(members),
+    ],
+  );
+};
+
 const grouped = (
   rows: ReportRow[],
   args: Readonly<Record<string, string>>,
   defaults: Layout,
   context: ViewContext,
-): string[] => {
-  const sorted = sortRows(rows, list(args.sort ?? defaults.sort), context.index);
-  if (!args.group) return layout(sorted, args, defaults, context);
-  const dir = posix.dirname(context.rel);
-  const groupOrder = [...(defaults.groupOrder?.[args.group] ?? [])];
-  return groupRows(sorted, { groupBy: args.group, groupOrder }, context.index).flatMap(
-    ({ name, members }, i) => [
-      ...(i > 0 ? [""] : []),
-      `**${groupTitle(name, args.group ?? "", dir) || EMPTY}**`,
-      "",
-      ...layout(members, args, defaults, context),
-    ],
+): string[] =>
+  sections(
+    sortRows(rows, list(args.sort ?? defaults.sort), context.index),
+    args,
+    defaults,
+    context,
+    (members) => layout(members, args, defaults, context),
   );
-};
 
 /** Lines of a block; nothing when the git data it needs was not read. */
 type View = (args: Readonly<Record<string, string>>, context: ViewContext) => string[] | undefined;
@@ -126,26 +142,30 @@ const changes: View = (args, context) => {
   const { since: _, ...rest } = args;
   const outputDir = posix.dirname(context.rel);
   const config = context.index.config;
-  const rows = changeRows(context.index, before).filter(
+  const rows = changeRows(
+    context.index,
+    before,
     itemMatches(context.index, filtersOf(rest, context.base)),
   );
   const note = moved ? [baseNote(config, moved), ""] : [];
   if (rows.length === 0) return [...note, config.labels.noChanges];
+  const groupOrder = { change: changeLabels(config) };
+  const counts = (members: Item[], by: string | undefined) =>
+    renderChangeCounts(members, context.index, { by, label: rest.label, outputDir });
+  // Counts alone grouped are a row per group; with `by` as well, a table per group.
   if (rest.as === "counts")
     return [
       ...note,
-      ...renderChangeCounts(rows, context.index, { by: rest.by, label: rest.label, outputDir }),
+      ...(rest.by === undefined
+        ? counts(rows, rest.group)
+        : sections(rows, rest, { groupOrder }, context, (members) => counts(members, rest.by))),
     ];
   return [
     ...note,
     ...grouped(
       rows,
       rest,
-      {
-        ...DEFAULTS.changes,
-        labels: { change: config.labels.change },
-        groupOrder: { change: changeLabels(config) },
-      },
+      { ...DEFAULTS.changes, labels: { change: config.labels.change }, groupOrder },
       context,
     ),
   ];

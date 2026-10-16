@@ -284,7 +284,7 @@ describe("carrying a summary over", () => {
     expect(fallback).toEndWith("<!-- write: the risks -->");
   });
 
-  test("text after a block follows that block's opening line, not how many blocks sit above", () => {
+  test("text after a block follows its kind and place under its heading, not blocks above", () => {
     const template = [
       "## New",
       "",
@@ -341,6 +341,75 @@ describe("carrying a summary over", () => {
     expect(carried).toContain("<!-- write: -->\nUrgent notes.\n\n## Devops");
     expect(carried).toContain("<!-- write: -->\nDevops notes.\n\n## Moved");
     expect(carried).toEndWith("<!-- write: -->\nWeb notes under the heading.");
+  });
+
+  test("a block whose options changed keeps its text; same-kind blocks elsewhere do not shift it", () => {
+    const template = [
+      "## Specs",
+      "",
+      "<!-- trove:documents type=spec -->",
+      "<!-- /trove:documents -->",
+      "",
+      "<!-- write: -->",
+      "",
+      "## Plans",
+      "",
+      '<!-- trove:documents type=plan format="{document} — {status}: {note}" owner=!ops -->',
+      "<!-- /trove:documents -->",
+      "",
+      "<!-- write: -->",
+      "",
+      "<!-- trove:documents type=plan status=closed as=ids -->",
+      "<!-- /trove:documents -->",
+      "",
+      "<!-- write: -->",
+    ].join("\n");
+    const previous = [
+      "## Plans",
+      "",
+      '<!-- trove:documents type=plan format="{document} — {status}" -->',
+      "- PLAN_ROLLOUT — current",
+      "<!-- /trove:documents -->",
+      "",
+      "Rollout first.",
+      "",
+      "<!-- trove:documents type=plan status=closed -->",
+      "<!-- /trove:documents -->",
+      "",
+      "Closed plans.",
+    ].join("\n");
+    const carried = carryWritten(template, previous);
+    expect(carried).toContain("<!-- /trove:documents -->\n\n<!-- write: -->\n\n## Plans");
+    expect(carried).toContain("<!-- write: -->\nRollout first.\n\n<!-- trove:documents type=plan");
+    expect(carried).toEndWith("<!-- write: -->\nClosed plans.");
+  });
+
+  test("text after a block the template no longer has goes to a place of the same section", () => {
+    const template = [
+      "## Risks",
+      "",
+      "<!-- trove:counts type=risk -->",
+      "<!-- /trove:counts -->",
+      "",
+      "<!-- write: -->",
+      "",
+      "## Later",
+      "",
+      "<!-- write: -->",
+    ].join("\n");
+    const previous = [
+      "## Risks",
+      "",
+      "<!-- trove:items type=risk -->",
+      "<!-- /trove:items -->",
+      "",
+      "Backups untested.",
+      "",
+      "## Later",
+    ].join("\n");
+    const carried = carryWritten(template, previous);
+    expect(carried).toContain("<!-- write: -->\nBackups untested.\n\n## Later");
+    expect(carried).toEndWith("## Later\n\n<!-- write: -->");
   });
 
   test("a place counts as written once text sits under its label", () => {

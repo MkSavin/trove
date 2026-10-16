@@ -64,8 +64,8 @@ export const renderCounts = (
 };
 
 /** Configured groups first, in their order; the rest by name, archived documents last. */
-export const groupRows = (
-  rows: readonly ReportRow[],
+export const groupRows = <Row extends ReportRow>(
+  rows: readonly Row[],
   section: Pick<ReportSection, "groupBy" | "groupOrder">,
   index: StoreIndex,
 ) => {
