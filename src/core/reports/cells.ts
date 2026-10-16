@@ -3,8 +3,9 @@ import type { ReportColumn } from "../config/schema.ts";
 import { allLedgers } from "../config/vocabulary.ts";
 import type { Document } from "../document/document.ts";
 import type { Item } from "../document/ledger.ts";
+import { driftedFiles } from "../index/drift.ts";
 import type { StoreIndex } from "../index/index.ts";
-import { documentField, itemField } from "../index/query.ts";
+import { DRIFT, documentField, itemField } from "../index/query.ts";
 
 export type ReportRow = Document | Item;
 
@@ -30,6 +31,18 @@ export const columnLabel = (column: ReportColumn, index: StoreIndex): string =>
     .find((ledgerColumn) => ledgerColumn.key === column.key)?.label ??
   column.key;
 
+/** A drifted item's cell names the changed files; filters still see `true`. */
+const cellValue = (
+  row: ReportRow,
+  key: string,
+  index: StoreIndex,
+  outputDir: string,
+): string | undefined => {
+  if (key === DOCUMENT_COLUMN) return linkTo(isDocument(row) ? row.rel : row.document, outputDir);
+  if (key === DRIFT && !isDocument(row)) return driftedFiles(index, row)?.join(", ");
+  return rowField(row, key, index);
+};
+
 /** Cell text with links relative to the report file, so they work wherever it is opened. */
 export const cellText = (
   row: ReportRow,
@@ -37,8 +50,6 @@ export const cellText = (
   index: StoreIndex,
   outputDir: string,
 ): string => {
-  const rel = isDocument(row) ? row.rel : row.document;
-  const value =
-    column.key === DOCUMENT_COLUMN ? linkTo(rel, outputDir) : rowField(row, column.key, index);
+  const value = cellValue(row, column.key, index, outputDir);
   return value ? value.replaceAll("|", "\\|") : (column.empty ?? EMPTY);
 };

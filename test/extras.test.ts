@@ -6,6 +6,9 @@ import { run } from "../src/cli/run.ts";
 import { toCsv } from "../src/core/export/csv.ts";
 import { sshHost, webRepo } from "../src/core/git/permalink.ts";
 import { resolveLinks } from "../src/core/index/links.ts";
+import { selectItems } from "../src/core/index/query.ts";
+import { queryRows } from "../src/core/index/rows.ts";
+import { renderView } from "../src/core/live/views.ts";
 import { applyPlan } from "../src/core/ops/apply.ts";
 import { moveItem } from "../src/core/ops/item-move.ts";
 import { pinDeadLinks } from "../src/core/ops/links-pin.ts";
@@ -299,6 +302,85 @@ describe("links --fix", () => {
     expect(await run(["links", "--fix", "--dry-run", ...flags], dry)).toBe(0);
     expect(dry.stdout()).toContain("dry run: nothing written");
     expect(await read(store, "audits/AUDIT_WEB_1.md")).toBe(before);
+  });
+});
+
+/** A code root committed before the web audit was checked on 2026-10-10, and `send.ts` changed after. */
+const driftedRepo = async (store: Store) => {
+  const harbor = join(store.root, "..", "harbor");
+  for (const file of ["web/src/composer/send.ts", "web/src/threads/ThreadView.tsx"]) {
+    await mkdir(dirname(join(harbor, file)), { recursive: true });
+    await Bun.write(join(harbor, file), "export {};\n");
+  }
+  const commitOn = async (date: string, message: string) => {
+    await Bun.$`git add -A`.cwd(harbor).quiet();
+    await Bun.$`git -c user.name=t -c user.email=t@t commit -qm ${message}`
+      .cwd(harbor)
+      .env({ ...process.env, GIT_COMMITTER_DATE: `${date}T12:00:00+0000` })
+      .quiet();
+  };
+  await Bun.$`git init -q`.cwd(harbor).quiet();
+  await commitOn("2026-10-01", "base");
+  await Bun.write(join(harbor, "web/src/threads/ThreadView.tsx"), "export const view = 1;\n");
+  await commitOn("2026-10-10", "same day as the check");
+  await Bun.$`git tag checked`.cwd(harbor).quiet();
+  await Bun.write(join(harbor, "web/src/composer/send.ts"), "export const retry = 1;\n");
+  await commitOn("2026-10-12", "retry sends");
+};
+
+describe("drift", () => {
+  test("an item drifts when code its section links to changed after the check", async () => {
+    const store = await sandbox();
+    await driftedRepo(store);
+    const drifted = selectItems(store.index, { drift: ["true"] }).map((item) => item.id);
+    expect(drifted).toEqual(["WEB1-1"]);
+    const rows = queryRows(store.index, "items", { id: ["WEB1-1", "WEB1-2", "WEB1-4"] }, [
+      "id",
+      "drift",
+    ]).rows;
+    expect(rows).toEqual([
+      { id: "WEB1-1", drift: "true" },
+      { id: "WEB1-2", drift: "false" },
+      { id: "WEB1-4", drift: "false" },
+    ]);
+
+    const io = captureIo(store.root);
+    const args = ["query", "items", "drift=true", "--columns", "id,drift"];
+    expect(await run([...args, "--store", store.root], io)).toBe(0);
+    expect(io.stdout()).toMatch(/WEB1-1\s+true/);
+  });
+
+  test("a block cell names the changed files", async () => {
+    const store = await sandbox();
+    await driftedRepo(store);
+    const context = { index: store.index, rel: "NOTES.md", base: {} };
+    expect(renderView("items", { id: "WEB1-1,WEB1-2", columns: "id,drift" }, context)).toBe(
+      [
+        "| id | drift |",
+        "| -- | ----- |",
+        "| WEB1-1 | web/src/composer/send.ts |",
+        "| WEB1-2 | — |",
+      ].join("\n"),
+    );
+  });
+
+  test("a root with a ref reads changes at that ref, not in the checkout", async () => {
+    const store = await sandbox();
+    await driftedRepo(store);
+    const harbor = join(store.root, "..", "harbor");
+    await Bun.$`git branch -q tip`.cwd(harbor).quiet();
+    await Bun.$`git checkout -q checked`.cwd(harbor).quiet();
+    expect(selectItems(store.index, { drift: ["true"] })).toEqual([]);
+
+    const config = join(store.root, "trove.yaml");
+    const text = await Bun.file(config).text();
+    await Bun.write(
+      config,
+      text.replace("harbor: ../harbor", "harbor: { path: ../harbor, ref: tip }"),
+    );
+    const reopened = await reopen(store);
+    const drifted = selectItems(reopened.index, { drift: ["true"] }).map((item) => item.id);
+    expect(drifted).toEqual(["WEB1-1"]);
   });
 });
 
