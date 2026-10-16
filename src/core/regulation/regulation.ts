@@ -92,7 +92,7 @@ Finished documents move to \`${config.archive.folder}/\` under the same path.
 
 const types = (config: Config): string => `# Document types
 
-A type is a set of capabilities. \`ledger\`: a table of open items; \`status-line\`: the visible status line; \`freshness\`: re-check within the limit; \`prompt-body\`: task text after \`<!-- ${PROMPT_MARKER} -->\`; \`generated\`: built by reports, never edited; \`series\`: numbered \`_N\`; \`versions\`: \`_V2\` with \`supersedes\`; \`resolved-of\`: the closed items of the document named in \`base\`, in a ledger of the same columns; \`stages\`: the first task list or table with a status column holds the stages, read as \`progress\` and \`next\`.
+A type is a set of capabilities. \`ledger\`: a table of open items; \`status-line\`: the visible status line; \`freshness\`: re-check within the limit; \`prompt-body\`: task text after \`<!-- ${PROMPT_MARKER} -->\`; \`generated\`: built by reports, never edited; \`series\`: numbered \`_N\`; \`versions\`: \`_V2\` with \`supersedes\`; \`resolved-of\`: the closed items of the document named in \`base\`, in a ledger of the same columns; \`stages\`: the first task list, table with a status column, or run of headings or bold labels coded like \`Э1\` or \`Stage 2\` holds the stages, read as \`progress\` and \`next\` while the document is not finished.
 
 ${table(
   ["type", "capabilities", "statuses", "starts as", "own fields"],

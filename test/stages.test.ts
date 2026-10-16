@@ -20,17 +20,130 @@ const store = await openStore({ cwd: root, store: root, today: TODAY });
 
 afterAll(() => rm(root, { recursive: true, force: true, maxRetries: 5 }));
 
-const plan = (body: string, type = "plan") =>
+const plan = (body: string, type = "plan", header = "", rel = "plans/PLAN_X.md") =>
   parseDocument(
-    {
-      path: join(root, "plans/PLAN_X.md"),
-      rel: "plans/PLAN_X.md",
-      text: `---\ntype: ${type}\n---\n${body}`,
-    },
+    { path: join(root, rel), rel, text: `---\ntype: ${type}\n${header}---\n${body}` },
     store.config,
   );
 
 const field = (body: string, name: string) => documentField(plan(body), name, store.index);
+
+describe("stages written as headings or bold labels", () => {
+  test("coded sibling headings are stages; a mark, a parenthesis or a status line says done", () => {
+    const body = [
+      "# Plan",
+      "**Status:** in progress",
+      "## Э1. Каталог (влит)",
+      "### Шаги",
+      "text",
+      "## Э2. Поиск",
+      "**Статус:** слито в master",
+      "## [x] Э3. Корзина",
+      "## Э4 — Оплата ✅",
+      "## Э5. Уведомления",
+      "Статус: не влито",
+      "## Э6. **Экспорт** в `csv`. Потом всё остальное (in progress)",
+      "## Риски",
+      "## Э7. After the run",
+    ].join("\n");
+    expect(plan(body).stages).toEqual([
+      { title: "Э1 — Каталог", done: true },
+      { title: "Э2 — Поиск", done: true },
+      { title: "Э3 — Корзина", done: true },
+      { title: "Э4 — Оплата", done: true },
+      { title: "Э5 — Уведомления", done: false },
+      { title: "Э6 — Экспорт в csv", done: false },
+    ]);
+    expect(field(body, "next")).toBe("Э5 — Уведомления");
+  });
+
+  test("Stage and Этап headings work in either language", () => {
+    const body =
+      "### Stage 1 — Outbox\nStatus: done\n### Stage 2 — Done\n### Stage 3 — Complete rewrite\n";
+    expect(plan(body).stages).toEqual([
+      { title: "Stage 1 — Outbox", done: true },
+      { title: "Stage 2", done: true },
+      { title: "Stage 3 — Complete rewrite", done: false },
+    ]);
+    expect(field("## Этап 1. Схема (готово)\n## Этап 2. Данные\n", "progress")).toBe("1/2");
+  });
+
+  test("bold labels in paragraphs are stages", () => {
+    const body = [
+      "**Б1.** Перенести [очередь](https://example.com) на `outbox`. Подробности ниже (done)",
+      "",
+      "**Б2 — влито.** Кэш профилей.",
+      "",
+      "**Б3.** Настройки синхронизации.",
+      "**Статус:** выполнен",
+      "",
+      "**Б4.** Поиск по истории, который очень долго описывается и никак не может закончиться вовремя",
+    ].join("\n");
+    expect(plan(body).stages).toEqual([
+      { title: "Б1 — Перенести очередь на outbox", done: true },
+      { title: "Б2 — Кэш профилей", done: true },
+      { title: "Б3 — Настройки синхронизации", done: true },
+      {
+        title:
+          "Б4 — Поиск по истории, который очень долго описывается и никак не может закончиться…",
+        done: false,
+      },
+    ]);
+  });
+
+  test("a lone coded heading, mixed codes or plain numbered sections are not stages", () => {
+    expect(field("## S3 bucket\n## Rollout\n", "progress")).toBeUndefined();
+    expect(field("## A1. One\n## B1. Two\n", "progress")).toBeUndefined();
+    expect(field("## 1. Context\n## 2. Design\n", "progress")).toBeUndefined();
+    expect(field("**Note.** one\n\n**B1.** two\n", "progress")).toBeUndefined();
+  });
+
+  test("the first structure in the body wins", () => {
+    const body = "- [x] prerequisite\n\n## S1. One\n## S2. Two\n";
+    expect(field(body, "progress")).toBe("1/1");
+    const table = "## S1. One\n## S2. Two (done)\n\n| stage | status |\n| - | - |\n| S1 | done |\n";
+    expect(field(table, "progress")).toBe("1/2");
+  });
+
+  test("a type without the capability never reads them", () => {
+    expect(plan("## A1. One\n## A2. Two\n", "audit").stages).toEqual([]);
+  });
+});
+
+describe("stage titles and done words", () => {
+  test("titles lose markup and keep their first sentence", () => {
+    const body = [
+      "| # | stage | status |",
+      "| - | ----- | ------ |",
+      "| Э1 | **Outbox** with [retries](x.md). Then more | done |",
+      "| Э2 | `cache` _warm-up_ for snake_case names | todo |",
+    ].join("\n");
+    expect(plan(body).stages.map((stage) => stage.title)).toEqual([
+      "Outbox with retries",
+      "cache warm-up for snake_case names",
+    ]);
+  });
+
+  test("the defaults cover more words without counting their negations", () => {
+    const words = ["влито", "слито", "в master", "done ✓", "выполнен", "реализовано", "готов"];
+    const more = ["сделан", "merged", "shipped", "released", "complete"];
+    const negated = ["не влито", "not done", "не готов", "incomplete", "готовится"];
+    const rows = [...words, ...more, ...negated].map((value, i) => `| ${i} | ${value} |`);
+    const doc = plan(["| stage | status |", "| - | - |", ...rows].join("\n"));
+    expect(doc.stages.map((stage) => stage.done)).toEqual([
+      ...[...words, ...more].map(() => true),
+      ...negated.map(() => false),
+    ]);
+  });
+
+  test("finished documents have no stages", () => {
+    const body = "- [x] one\n- [ ] two\n";
+    expect(plan(body, "plan", "status: closed\n").stages).toEqual([]);
+    expect(plan(body, "plan", "status: archived\n").stages).toEqual([]);
+    expect(plan(body, "plan", "", ".archive/plans/PLAN_X.md").stages).toEqual([]);
+    expect(plan(body, "plan", "status: in progress\n").stages).toHaveLength(2);
+  });
+});
 
 describe("stages of a plan", () => {
   test("a task list counts its top-level items; nested ones are steps", () => {
@@ -111,13 +224,13 @@ describe("the progress view", () => {
       '| [PLAN_OFFLINE_MODE](plans/PLAN_OFFLINE_MODE.md) | 0/3 ▱▱▱ | outbox with retries and a "not sent" mark |',
     );
     expect(text).toContain(
-      "| [PLAN_PUSH_RETRY](plans/PLAN_PUSH_RETRY.md) | 1/3 ▰▱▱ | **Drop tokens that fail three times in a row.** In progress. |",
+      "| [PLAN_PUSH_RETRY](plans/PLAN_PUSH_RETRY.md) | 1/3 ▰▱▱ | Drop tokens that fail three times in a row |",
     );
   });
 
   test("takes filters and the list layout", () => {
     const { text } = fill("<!-- trove:progress next=~Drop as=list -->");
-    expect(text).toContain("- [PLAN_PUSH_RETRY](plans/PLAN_PUSH_RETRY.md) 1/3 ▰▱▱ — **Drop tokens");
+    expect(text).toContain("- [PLAN_PUSH_RETRY](plans/PLAN_PUSH_RETRY.md) 1/3 ▰▱▱ — Drop tokens");
     expect(text).not.toContain("PLAN_OFFLINE_MODE");
   });
 });
