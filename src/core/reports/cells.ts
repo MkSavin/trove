@@ -3,13 +3,14 @@ import type { ReportColumn } from "../config/schema.ts";
 import { allLedgers } from "../config/vocabulary.ts";
 import type { Document } from "../document/document.ts";
 import type { Item } from "../document/ledger.ts";
-import { driftedFiles } from "../index/drift.ts";
+import { type Drift, itemDrift } from "../index/drift.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { DRIFT, documentField, itemField } from "../index/query.ts";
 
 export type ReportRow = Document | Item;
 
 const EMPTY = "—";
+const UNCHECKED = "?";
 const DOCUMENT_COLUMN = "document";
 
 export const isDocument = (row: ReportRow): row is Document => "rel" in row;
@@ -35,7 +36,12 @@ export const columnLabel = (column: ReportColumn, index: StoreIndex): string =>
     .find((ledgerColumn) => ledgerColumn.key === column.key)?.label ??
   column.key;
 
-/** A drifted item's cell names the changed files; filters still see `true`. */
+/** A drifted item's cell names what changed; filters still see `true`. */
+const driftCell = (drift: Drift): string | undefined => {
+  if (drift.state === "true") return drift.changed.join(", ");
+  return drift.state === "unknown" ? UNCHECKED : undefined;
+};
+
 const cellValue = (
   row: ReportRow,
   key: string,
@@ -44,7 +50,7 @@ const cellValue = (
 ): string | undefined => {
   if (key === DOCUMENT_COLUMN)
     return documentCell(isDocument(row) ? row.rel : row.document, index, outputDir);
-  if (key === DRIFT && !isDocument(row)) return driftedFiles(index, row)?.join(", ");
+  if (key === DRIFT && !isDocument(row)) return driftCell(itemDrift(index, row));
   return rowField(row, key, index);
 };
 
