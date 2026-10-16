@@ -3,7 +3,8 @@ import { addItem } from "../../core/ops/item-add.ts";
 import { closeItem } from "../../core/ops/item-close.ts";
 import { deferItem } from "../../core/ops/item-defer.ts";
 import { moveItem } from "../../core/ops/item-move.ts";
-import { parse, parsePairs } from "../args.ts";
+import { recheckItems } from "../../core/ops/item-recheck.ts";
+import { parse, parseFilters, parsePairs } from "../args.ts";
 import type { Command } from "../command.ts";
 import { defineGroup } from "../group.ts";
 import { OP_OPTIONS, runPlan } from "../ops.ts";
@@ -81,9 +82,33 @@ const itemMove: Command = {
   },
 };
 
-export const item = defineGroup("item", "Add, close, defer and move ledger items", [
+const isFilter = (arg: string): boolean => arg.includes("=");
+
+const itemRecheck: Command = {
+  name: "recheck",
+  summary: "Set items' checked to the commit their code is at now, so drift starts over",
+  usage: "trove item recheck [<id>...] [--drifted] [--unchanged] [field=value...] [--dry-run]",
+  run: async (argv, io) => {
+    const { values, positionals } = parse(argv, {
+      ...OP_OPTIONS,
+      drifted: { type: "boolean", default: false },
+      unchanged: { type: "boolean", default: false },
+    });
+    const store = await openFromFlags(values, io);
+    const plan = recheckItems(store.index, {
+      ids: positionals.filter((arg) => !isFilter(arg)),
+      filters: parseFilters(positionals.filter(isFilter)),
+      drifted: values.drifted,
+      unchanged: values.unchanged,
+    });
+    return runPlan(store, plan, io, values["dry-run"]);
+  },
+};
+
+export const item = defineGroup("item", "Add, close, defer, move and recheck ledger items", [
   itemAdd,
   itemClose,
   itemDefer,
   itemMove,
+  itemRecheck,
 ]);

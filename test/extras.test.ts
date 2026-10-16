@@ -12,6 +12,7 @@ import { queryRows } from "../src/core/index/rows.ts";
 import { renderView } from "../src/core/live/views.ts";
 import { applyPlan } from "../src/core/ops/apply.ts";
 import { moveItem } from "../src/core/ops/item-move.ts";
+import { recheckItems } from "../src/core/ops/item-recheck.ts";
 import { pinDeadLinks } from "../src/core/ops/links-pin.ts";
 import { lineDiff } from "../src/core/text/diff.ts";
 import { openStore, runRules, type Store } from "../src/index.ts";
@@ -368,7 +369,7 @@ describe("drift", () => {
     expect(drifted).toEqual(["WEB1-1"]);
     expect(driftOf(store, ["WEB1-1", "WEB1-2", "WEB1-4", "WEB1-7"])).toEqual([
       { id: "WEB1-1", drift: "true" },
-      { id: "WEB1-2", drift: "false" },
+      { id: "WEB1-2", drift: "file" },
       { id: "WEB1-4", drift: "false" },
       { id: "WEB1-7", drift: "unknown" },
     ]);
@@ -377,6 +378,8 @@ describe("drift", () => {
     const args = ["query", "items", "drift=true", "--columns", "id,drift"];
     expect(await run([...args, "--store", store.root], io)).toBe(0);
     expect(io.stdout()).toMatch(/WEB1-1\s+true/);
+    const elsewhere = selectItems(store.index, { drift: ["file"] }).map((item) => item.id);
+    expect(elsewhere).toEqual(["WEB1-2"]);
 
     view[87] = "export const line88 = 'virtualized';";
     await writeLines(store, VIEW, ["// a", "// b", "// c", ...view]);
@@ -388,12 +391,14 @@ describe("drift", () => {
     const store = await sandbox();
     await driftedRepo(store);
     const context = { index: store.index, rel: "NOTES.md", base: {} };
-    expect(renderView("items", { id: "WEB1-1,WEB1-2,WEB1-7", columns: "id,drift" }, context)).toBe(
+    const ids = "WEB1-1,WEB1-2,WEB1-4,WEB1-7";
+    expect(renderView("items", { id: ids, columns: "id,drift" }, context)).toBe(
       [
         "| id | drift |",
         "| -- | ----- |",
         `| WEB1-1 | ${SEND}:41-63 |`,
-        "| WEB1-2 | — |",
+        `| WEB1-2 | ${VIEW} (other lines) |`,
+        "| WEB1-4 | — |",
         "| WEB1-7 | ? |",
       ].join("\n"),
     );
@@ -488,6 +493,96 @@ describe("drift", () => {
     expect((hunks.get("new.ts") ?? []).some((hunk) => touches(hunk, { from: 9, to: 9 }))).toBe(
       true,
     );
+  });
+});
+
+const withConfig = async (store: Store, from: string, to: string): Promise<Store> => {
+  const config = join(store.root, "trove.yaml");
+  await Bun.write(config, (await Bun.file(config).text()).replace(from, to));
+  return reopen(store);
+};
+
+const WHAT_COLUMN = "    - { key: what, label: what is left, required: true }\n";
+
+const withCheckedColumn = (store: Store) =>
+  withConfig(store, WHAT_COLUMN, `${WHAT_COLUMN}    - { key: checked, label: checked }\n`);
+
+const harborHead = async (store: Store) =>
+  (await Bun.$`git rev-parse --short HEAD`.cwd(harborDir(store)).text()).trim();
+
+/** Line 45 of `send.ts` sits inside the lines WEB1-1 names once it is rechecked at the tip. */
+const editSendLine45 = async (store: Store, text: string, date: string) => {
+  const lines = (await Bun.file(join(harborDir(store), SEND)).text()).trimEnd().split("\n");
+  lines[44] = text;
+  await writeLines(store, SEND, lines);
+  await commitOn(store, date, `edit line 45 on ${date}`);
+};
+
+describe("item recheck", () => {
+  test("writes the root's commit into a new checked column, and drift starts over", async () => {
+    const store = await sandbox();
+    await driftedRepo(store);
+    expect(() => recheckItems(store.index, { ids: ["WEB1-1"] })).toThrow(/no checked column/);
+    expect(() => recheckItems(store.index, {})).toThrow(/needs ids/);
+
+    const ready = await withCheckedColumn(store);
+    const head = await harborHead(store);
+    const outcome = await applyPlan(ready, recheckItems(ready.index, { drifted: true }));
+    expect(outcome.introduced).toEqual([]);
+    expect(outcome.notes).toEqual([`WEB1-1 checked at ${head}`]);
+    const audit = await read(ready, "audits/AUDIT_WEB_1.md");
+    expect(audit).toContain("| id | P | module | owner | status | what is left | checked |");
+    expect(audit).toContain(`no "not sent" mark | ${head} |`);
+    expect(audit).toContain("on mid-range laptops |  |");
+    expect(driftOf(await reopen(ready), ["WEB1-1", "WEB1-2"])).toEqual([
+      { id: "WEB1-1", drift: "false" },
+      { id: "WEB1-2", drift: "file" },
+    ]);
+  });
+
+  test("--unchanged rechecks only items whose code changed in whitespace alone", async () => {
+    const store = await sandbox();
+    await driftedRepo(store);
+    const ready = await withCheckedColumn(store);
+    await applyPlan(ready, recheckItems(ready.index, { ids: ["WEB1-1"] }));
+
+    await editSendLine45(store, "export  const line35 =  35;", "2026-10-13");
+    expect(driftOf(await reopen(ready), ["WEB1-1"])).toEqual([{ id: "WEB1-1", drift: "true" }]);
+    const args = ["item", "recheck", "--drifted", "--unchanged", "--store", ready.root];
+    const spaces = captureIo(ready.root);
+    expect(await run(args, spaces)).toBe(0);
+    expect(spaces.stdout()).toContain(`WEB1-1 checked at ${await harborHead(store)}`);
+
+    await editSendLine45(store, "export const line35 = 36;", "2026-10-14");
+    const before = await read(ready, "audits/AUDIT_WEB_1.md");
+    const real = captureIo(ready.root);
+    expect(await run(args, real)).toBe(0);
+    expect(real.stdout()).toContain("left as they are, their code changed: WEB1-1");
+    expect(await read(ready, "audits/AUDIT_WEB_1.md")).toBe(before);
+  });
+});
+
+describe("stale-check", () => {
+  const messages = (store: Store, id: string) =>
+    runRules(store.rules, store.index)
+      .filter((d) => d.rule === "stale-check" && d.message.includes(`${id} `))
+      .map((d) => d.message);
+
+  test("is off by default, then flags old checks and code that kept changing", async () => {
+    const store = await sandbox();
+    await driftedRepo(store);
+    expect(messages(store, "WEB1-1")).toEqual([]);
+
+    const rule = "rules:\n  stale-check: { level: warn, limit: 3, commits: 1 }\n";
+    const on = await withConfig(await withCheckedColumn(store), "rules:\n", rule);
+    expect(messages(on, "WEB1-1").toSorted()).toEqual([
+      "WEB1-1 not checked for 5 days",
+      "the code of WEB1-1 changed in 1 commit(s) since its check",
+    ]);
+    expect(messages(on, "WEB1-4")).toEqual(["WEB1-4 not checked for 5 days"]);
+
+    await applyPlan(on, recheckItems(on.index, { ids: ["WEB1-1"] }));
+    expect(messages(await reopen(on), "WEB1-1")).toEqual([]);
   });
 });
 
