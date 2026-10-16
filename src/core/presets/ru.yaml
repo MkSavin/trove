@@ -40,10 +40,14 @@ labels:
   changeClosed: закрыт
   changeAdded: добавлен
   changeMoved: перенесён
+  noChanges: изменений нет
+  baseMoved: "база сдвинута на {commit} {date}: хранилища ещё не было на {since}"
   week: неделя
   trendOpened: открыто
   trendClosed: закрыто
+  trendMoved: перенесено
   trendOpen: открыто на конец
+  trendStart: на начало
 
 fields:
   type: required

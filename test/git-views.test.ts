@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git } from "../src/core/git/git.ts";
@@ -294,7 +294,7 @@ describe("changes", () => {
       nextDay.index,
       `---\nkind: web\ndate: 2026-10-21\n---\n${block("<!-- trove:changes -->")}`,
     );
-    expect(later.text).toContain("<!-- trove:changes -->\n—\n");
+    expect(later.text).toContain("<!-- trove:changes -->\nno changes\n");
   });
 
   test("a summary replacing one of the same day starts from that one", async () => {
@@ -303,7 +303,9 @@ describe("changes", () => {
     expect(plan.changes.map((change) => change.rel)).toContain(
       ".archive/summaries/SUMMARY_WEB_2026-10-20.md",
     );
-    expect(plan.changes[0]?.text).toContain("columns=change,id,document,from -->\n—\n<!--");
+    expect(plan.changes[0]?.text).toContain(
+      "columns=change,id,document,from -->\nno changes\n<!--",
+    );
   });
 
   test("since a date or a commit, filtered and laid out like items", async () => {
@@ -319,10 +321,12 @@ describe("changes", () => {
     expect(byCommit.text).toContain("API2-1, API2-5, API2-3, API2-4");
   });
 
-  test("before the history every item is new; no previous summary shows nothing", async () => {
+  test("before the history the store's first commit is the start; no previous summary shows nothing", async () => {
     const store = await open();
     const early = await fill(store.index, block("<!-- trove:changes since=2020-01-01 as=ids -->"));
-    expect(early.text).toContain("API2-2");
+    expect(early.text).toContain(
+      `base moved to ${base.slice(0, 7)} 2026-10-15: the store did not exist on 2020-01-01\n\nAPI2-1, API2-5, API2-3, API2-4\n`,
+    );
     const first = await fill(
       store.index,
       `---\nkind: none-yet\ndate: 2026-10-20\n---\n${block("<!-- trove:changes -->")}`,
@@ -359,6 +363,39 @@ describe("changes", () => {
     expect(byDate.text).toContain("**closed**\n\nAPI2-1\n");
     expect(byDate.text.replace("2026-10-15", "")).toBe(
       (await ids(docsBase)).text.replace(docsBase, ""),
+    );
+  });
+
+  test("a start before the store came in moves to its first commit; archived items are closed", async () => {
+    const repo = join(workspace, "migrated");
+    await mkdir(repo);
+    await git(repo, ["init", "--quiet", "--initial-branch=main"]);
+    const docs = await copySandbox("harbor: ../harbor", join(repo, "docs"));
+    const config = await Bun.file(join(docs, "trove.yaml")).text();
+    await rm(join(docs, "trove.yaml"));
+    await git(repo, ["add", "--all"]);
+    await commitOn(repo, "docs: old layout", "2026-10-01");
+    await Bun.write(join(docs, "trove.yaml"), config);
+    await git(repo, ["add", "--all"]);
+    await commitOn(repo, "docs: trove", "2026-10-08");
+    const first = (await git(repo, ["rev-parse", "--short=7", "HEAD"])).out;
+    await mkdir(join(docs, ".archive/audits"), { recursive: true });
+    await rename(join(docs, "audits/AUDIT_WEB_1.md"), join(docs, ".archive/audits/AUDIT_WEB_1.md"));
+    const store = await openStore({ cwd: docs, store: docs, today: "2026-10-21" });
+    const { text, problems } = await fill(
+      store.index,
+      block("<!-- trove:changes since=2026-10-05 group=change as=ids -->"),
+    );
+    expect(problems).toEqual([]);
+    expect(text).toContain(
+      [
+        `base moved to ${first} 2026-10-08: the store did not exist on 2026-10-05`,
+        "",
+        "**closed**",
+        "",
+        "WEB1-1, WEB1-2, WEB1-3, WEB1-4, WEB1-5, WEB1-6, WEB1-7, WEB1-8",
+        "<!-- /trove:changes -->",
+      ].join("\n"),
     );
   });
 
@@ -408,11 +445,11 @@ describe("trend", () => {
     expect(problems).toEqual([]);
     expect(text).toContain(
       [
-        "| week | opened | closed | open at end |",
-        "| ---- | ------ | ------ | ----------- |",
-        "| 2026-10-05 | 0 | 1 | 17 |",
-        "| 2026-10-12 | 1 | 0 | 18 |",
-        "| 2026-10-19 | 0 | 1 | 17 |",
+        "| week | opened | closed | moved | open at end |",
+        "| ---- | ------ | ------ | ----- | ----------- |",
+        "| 2026-10-05 | 0 | 1 | 0 | 17 |",
+        "| 2026-10-12 | 1 | 0 | 0 | 18 |",
+        "| 2026-10-19 | 0 | 1 | 0 | 17 |",
         "<!-- /trove:trend -->",
       ].join("\n"),
     );
@@ -425,16 +462,79 @@ describe("trend", () => {
     );
     expect(text).toContain(
       [
-        "| week | P | opened | closed | open at end |",
-        "| ---- | - | ------ | ------ | ----------- |",
-        "| 2026-10-12 | P1 | 0 | 0 | 1 |",
-        "| 2026-10-12 | P2 | 1 | 0 | 2 |",
-        "| 2026-10-19 | P1 | 0 | 0 | 1 |",
-        "| 2026-10-19 | P2 | 0 | 0 | 2 |",
+        "| week | P | opened | closed | moved | open at end |",
+        "| ---- | - | ------ | ------ | ----- | ----------- |",
+        "| 2026-10-12 | P1 | 0 | 0 | 0 | 1 |",
+        "| 2026-10-12 | P2 | 1 | 0 | 0 | 2 |",
+        "| 2026-10-19 | P1 | 0 | 0 | 0 | 1 |",
+        "| 2026-10-19 | P2 | 0 | 0 | 0 | 2 |",
         "<!-- /trove:trend -->",
       ].join("\n"),
     );
     const wrong = await fill(store.index, block("<!-- trove:trend weeks=x -->"));
     expect(wrong.problems[0]?.message).toBe("weeks=x: give a number of weeks from 1 to 104");
+  });
+
+  test("by a field the ledger lacks: the document's field, else the fallback", async () => {
+    const owners = async (args: string) =>
+      (await fill(store.index, block(`<!-- trove:trend weeks=1 type=debt by=owner ${args}-->`)))
+        .text;
+    expect(await owners("")).toContain("| 2026-10-19 | — | 0 | 0 | 0 | 3 |");
+    expect(await owners("fallback=section ")).toContain(
+      "| 2026-10-19 | Infra | 0 | 0 | 0 | 1 |\n| 2026-10-19 | Server | 0 | 0 | 0 | 2 |",
+    );
+    const debt = Bun.file(join(store.root, "DEBT.md"));
+    await Bun.write(debt, (await debt.text()).replace("type: debt\n", "type: debt\nowner: core\n"));
+    const reopened = await openStore({ cwd: store.root, store: store.root, today: "2026-10-21" });
+    const { text } = await fill(
+      reopened.index,
+      block("<!-- trove:trend weeks=1 type=debt by=owner fallback=section -->"),
+    );
+    expect(text).toContain("| 2026-10-19 | core | 0 | 0 | 0 | 3 |");
+  });
+
+  test("the week the store came in shows what it started with; moves and archiving count apart", async () => {
+    const repo = join(workspace, "imported");
+    await mkdir(repo);
+    await git(repo, ["init", "--quiet", "--initial-branch=main"]);
+    await Bun.write(join(repo, "code.txt"), "code\n");
+    await commitAll(repo, "code", "2026-09-20");
+    const docs = await copySandbox("harbor: ../harbor", join(repo, "docs"));
+    await commitAll(repo, "docs: import", "2026-10-08");
+    const on = () => openStore({ cwd: docs, store: docs, today: "2026-10-21" });
+    const moving = await on();
+    await applyPlan(moving, await moveItem(moving.index, "API2-3", "AUDIT_MOBILE_1"));
+    await commitAll(repo, "docs: move API2-3", "2026-10-14");
+    await mkdir(join(docs, ".archive/audits"), { recursive: true });
+    await rename(join(docs, "audits/AUDIT_WEB_1.md"), join(docs, ".archive/audits/AUDIT_WEB_1.md"));
+    const store = await on();
+    const trend = async (filter: string) => {
+      const { text, problems } = await fill(
+        store.index,
+        block(`<!-- trove:trend weeks=4${filter} -->`),
+      );
+      expect(problems).toEqual([]);
+      return text;
+    };
+    expect(await trend("")).toContain(
+      [
+        "| week | opened | closed | moved | open at end |",
+        "| ---- | ------ | ------ | ----- | ----------- |",
+        "| 2026-10-05 (at start) | — | — | — | 18 |",
+        "| 2026-10-12 | 0 | 0 | 1 | 18 |",
+        "| 2026-10-19 | 0 | 8 | 0 | 10 |",
+        "<!-- /trove:trend -->",
+      ].join("\n"),
+    );
+    expect(await trend(" path=!**/mobile/**")).toContain(
+      [
+        "| 2026-10-05 (at start) | — | — | — | 15 |",
+        "| 2026-10-12 | 0 | 0 | 1 | 14 |",
+        "| 2026-10-19 | 0 | 8 | 0 | 6 |",
+      ].join("\n"),
+    );
+    expect(await trend(" path=audits/AUDIT_WEB_1.md")).toContain(
+      "| 2026-10-12 | 0 | 0 | 0 | 8 |\n| 2026-10-19 | 0 | 8 | 0 | 0 |",
+    );
   });
 });

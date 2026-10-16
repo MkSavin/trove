@@ -8,7 +8,7 @@ import { cellText, columnLabel, groupTitle, type ReportRow } from "../reports/ce
 import { groupRows, renderCounts, sortRows, tableLines } from "../reports/section.ts";
 import { branchesKey, branchesRoot, renderBranches } from "./branches.ts";
 import { renderChangeCounts } from "./change-counts.ts";
-import { changeLabels, changeRows, changesKey } from "./changes.ts";
+import { baseNote, changeLabels, changeRows, changesKey } from "./changes.ts";
 import { loaded } from "./git-data.ts";
 import { renderTrend, trendKey } from "./trend.ts";
 
@@ -121,28 +121,34 @@ type View = (args: Readonly<Record<string, string>>, context: ViewContext) => st
 const changes: View = (args, context) => {
   const baseline = loaded(context.index.gitData?.changes.get(changesKey(context.rel, args)));
   if (!baseline) return undefined;
-  const before = baseline.value.before;
+  const { before, moved } = baseline.value;
   if (!before) return [EMPTY];
   const { since: _, ...rest } = args;
   const outputDir = posix.dirname(context.rel);
+  const config = context.index.config;
   const rows = changeRows(context.index, before, outputDir).filter(
     itemMatches(context.index, filtersOf(rest, context.base)),
   );
-  if (rest.as === "counts") {
-    if (rows.length === 0) return [EMPTY];
-    return renderChangeCounts(rows, context.index, { by: rest.by, label: rest.label, outputDir });
-  }
-  const config = context.index.config;
-  return grouped(
-    rows,
-    rest,
-    {
-      ...DEFAULTS.changes,
-      labels: { change: config.labels.change },
-      groupOrder: { change: changeLabels(config) },
-    },
-    context,
-  );
+  const note = moved ? [baseNote(config, moved), ""] : [];
+  if (rows.length === 0) return [...note, config.labels.noChanges];
+  if (rest.as === "counts")
+    return [
+      ...note,
+      ...renderChangeCounts(rows, context.index, { by: rest.by, label: rest.label, outputDir }),
+    ];
+  return [
+    ...note,
+    ...grouped(
+      rows,
+      rest,
+      {
+        ...DEFAULTS.changes,
+        labels: { change: config.labels.change },
+        groupOrder: { change: changeLabels(config) },
+      },
+      context,
+    ),
+  ];
 };
 
 const branches: View = (args, context) => {
@@ -162,9 +168,10 @@ const branches: View = (args, context) => {
 const trend: View = (args, context) => {
   const history = loaded(context.index.gitData?.trend.get(trendKey(args)));
   if (!history) return undefined;
-  const { weeks: _, ...rest } = args;
+  const { weeks: _, fallback, ...rest } = args;
   return renderTrend(history.value, context.index, {
     by: rest.by,
+    fallback,
     label: rest.label,
     matches: itemMatches(context.index, filtersOf(rest, context.base)),
     outputDir: posix.dirname(context.rel),

@@ -79,21 +79,25 @@ const previousSummary = (index: StoreIndex, source: BlockSource): Document | und
   return latest(replaced) ?? latest(others.filter((doc) => (doc.meta.date ?? "") < date));
 };
 
+/** A start with the date or commit it stands for, as notes name it. */
+export type StartPoint = Start & { on: string };
+
 /** `since=previous|<date>|<commit>`; nothing when there is no previous summary to start from. */
 export const startOf = async (
   index: StoreIndex,
   source: BlockSource,
   since: string,
-): Promise<Start | undefined> => {
+): Promise<StartPoint | undefined> => {
   if (since === PREVIOUS) {
     const previous = previousSummary(index, source);
     if (!previous) return undefined;
+    const on = previous.meta.date ?? index.today;
     const commit = await addedIn(index.root, previous.rel);
-    return commit ? { commit } : commitBefore(index.root, previous.meta.date ?? index.today);
+    return commit ? { commit, on } : { ...(await commitBefore(index.root, on)), on };
   }
-  if (isIsoDate(since)) return commitBefore(index.root, since);
+  if (isIsoDate(since)) return { ...(await commitBefore(index.root, since)), on: since };
   const found = await git(index.root, ["rev-parse", "--verify", "--quiet", `${since}^{commit}`]);
   if (!found.ok)
     throw new TroveError(`since=${since}: give previous, a date or a commit of the store`);
-  return { commit: found.out };
+  return { commit: found.out, on: since };
 };

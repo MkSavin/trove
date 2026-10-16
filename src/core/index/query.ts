@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import type { Document } from "../document/document.ts";
 import { staleDays } from "../document/freshness.ts";
 import type { Item } from "../document/ledger.ts";
@@ -53,9 +54,13 @@ export const documentField = (
   }
 };
 
+/** An item read from history keeps its old path; a document moved since is found by name. */
+export const itemDocument = (item: Item, index: StoreIndex): Document | undefined =>
+  index.byRel.get(item.document) ?? index.byName.get(basename(item.document));
+
 /** Ledger columns first; any other field reads the item's document, so `path=…` works on items. */
 export const itemField = (item: Item, field: string, index: StoreIndex): string | undefined => {
-  if (field === "document") return item.document;
+  if (field === "document" || field === "path") return item.document;
   if (field === "section") return item.section;
   if (field === STATE) return item.closed ? "closed" : "open";
   if (field === WAITING) {
@@ -63,7 +68,7 @@ export const itemField = (item: Item, field: string, index: StoreIndex): string 
   }
   if (field === DRIFT) return itemDrift(index, item).state;
   if (Object.hasOwn(item.values, field)) return item.values[field];
-  const doc = index.byRel.get(item.document);
+  const doc = itemDocument(item, index);
   return doc ? documentField(doc, field, index) : undefined;
 };
 

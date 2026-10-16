@@ -7,14 +7,16 @@ import type { StoreIndex } from "../index/index.ts";
 import { documentCell } from "../reports/cells.ts";
 import { compareNatural } from "../text/compare.ts";
 import type { BlockSource } from "./git-data.ts";
+import { currentRel, isLive } from "./item-state.ts";
 import { itemsAt } from "./items-at.ts";
 import { movedOut } from "./moved-out.ts";
 import { startOf } from "./since.ts";
+import { type MovedBase, startWithStore } from "./store-start.ts";
 
 type Args = Readonly<Record<string, string>>;
 
 /** The items as they were at the starting point; `before` is missing when there is none. */
-export type Baseline = { before: readonly Item[] | undefined };
+export type Baseline = { before: readonly Item[] | undefined; moved?: MovedBase | undefined };
 
 type Change = "closed" | "added" | "moved";
 
@@ -38,27 +40,34 @@ export const loadChanges = async (
     throw new TroveError("trove:changes reads the store's git history: the store has none");
   const start = await startOf(index, source, args.since ?? "previous");
   if (!start) return { before: undefined };
-  return { before: start.commit ? await itemsAt(index, start.commit) : [] };
+  const { commit, moved } = await startWithStore(index.root, start);
+  return { before: commit ? await itemsAt(index, commit) : [], moved };
 };
 
-const isOpen = (item: Item | undefined): item is Item => item !== undefined && !item.closed;
-
-const changeOf = (then: Item | undefined, now: Item | undefined): Change | undefined => {
-  if (isOpen(now)) {
-    if (!isOpen(then)) return "added";
+const changeOf = (
+  config: Config,
+  then: Item | undefined,
+  now: Item | undefined,
+): Change | undefined => {
+  const wasOpen = isLive(then, config);
+  if (isLive(now, config)) {
+    if (!wasOpen) return "added";
     return basename(then.document) === basename(now.document) ? undefined : "moved";
   }
-  if (now === undefined) return isOpen(then) ? "closed" : undefined;
-  return then === undefined || isOpen(then) ? "closed" : undefined;
+  if (now === undefined) return wasOpen ? "closed" : undefined;
+  return then === undefined || wasOpen ? "closed" : undefined;
 };
-
-/** A document that left its place, e.g. into the archive, is found again by its name. */
-const currentRel = (index: StoreIndex, rel: string): string =>
-  index.byRel.has(rel) ? rel : (index.byName.get(basename(rel))?.rel ?? rel);
 
 /** The change values in the order rows come in. */
 export const changeLabels = (config: Config): string[] =>
   ORDER.map((change) => config.labels[LABEL[change]]);
+
+/** The line saying the start moved to the store's first commit, filled from `baseMoved`. */
+export const baseNote = (config: Config, moved: MovedBase): string =>
+  config.labels.baseMoved
+    .replaceAll("{commit}", moved.commit.slice(0, 7))
+    .replaceAll("{date}", moved.date)
+    .replaceAll("{since}", moved.on);
 
 type Row = { change: Change; item: Item; from: string | undefined; to: string | undefined };
 
@@ -69,7 +78,7 @@ const rowOf = (
   after: Item | undefined,
   now: ReadonlyMap<string, Item>,
 ): Row | undefined => {
-  const found = changeOf(before, after);
+  const found = changeOf(index.config, before, after);
   const item = after ?? before;
   if (!found || !item) return undefined;
   const from = before && currentRel(index, before.document);

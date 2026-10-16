@@ -11,10 +11,14 @@ const VIEW_LABELS = [
   "changeClosed",
   "changeAdded",
   "changeMoved",
+  "noChanges",
+  "baseMoved",
   "week",
   "trendOpened",
   "trendClosed",
+  "trendMoved",
   "trendOpen",
+  "trendStart",
 ];
 
 type Raw = Record<string, unknown>;

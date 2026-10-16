@@ -160,10 +160,14 @@
         "changeClosed": "closed",
         "changeAdded": "added",
         "changeMoved": "moved",
+        "noChanges": "no changes",
+        "baseMoved": "base moved to {commit} {date}: the store did not exist on {since}",
         "week": "week",
         "trendOpened": "opened",
         "trendClosed": "closed",
-        "trendOpen": "open at end"
+        "trendMoved": "moved",
+        "trendOpen": "open at end",
+        "trendStart": "at start"
       },
       "type": "object",
       "properties": {
@@ -235,6 +239,14 @@
           "default": "moved",
           "type": "string"
         },
+        "noChanges": {
+          "default": "no changes",
+          "type": "string"
+        },
+        "baseMoved": {
+          "default": "base moved to {commit} {date}: the store did not exist on {since}",
+          "type": "string"
+        },
         "week": {
           "default": "week",
           "type": "string"
@@ -247,8 +259,16 @@
           "default": "closed",
           "type": "string"
         },
+        "trendMoved": {
+          "default": "moved",
+          "type": "string"
+        },
         "trendOpen": {
           "default": "open at end",
+          "type": "string"
+        },
+        "trendStart": {
+          "default": "at start",
           "type": "string"
         }
       },
