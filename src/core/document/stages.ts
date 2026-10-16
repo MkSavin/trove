@@ -3,30 +3,20 @@ import { findLiveBlocks } from "../live/blocks.ts";
 import type { Block } from "../markdown/blocks.ts";
 import { parseTables } from "../markdown/tables.ts";
 import type { Line } from "../text/lines.ts";
+import { isBareNumber } from "./stage-code.ts";
+import { isDone } from "./stage-done.ts";
+import { stageHeadings, stageLabels } from "./stage-sections.ts";
+import { shortTitle, stripMarkup } from "./stage-text.ts";
 
 export type Stage = { title: string; done: boolean };
 
-type Found = { line: number; stages: Stage[] };
+export type FoundStages = { line: number; stages: Stage[] };
 
 const TASK = /^(\s*)(?:[-*+]|\d+[.)])\s+\[([ xX])\](?:\s+(.*))?$/;
 const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s/;
-const STAGE_NUMBER = /^#?\d+[.)]?$/;
-const MARKUP = /[*_`]/g;
-const WORD_CHARACTER = /[\p{L}\p{N}]/u;
-
-const plain = (text: string): string => text.replace(MARKUP, "").trim().toLowerCase();
-
-/** `merged 2026-10-01` and `✓ merged` count as done; `incomplete` and `not done` do not. */
-const isDone = (cell: string, done: readonly string[]): boolean => {
-  const text = plain(cell);
-  return done.some((word) => {
-    const value = word.toLowerCase();
-    return text.startsWith(value) && !WORD_CHARACTER.test(text.charAt(value.length));
-  });
-};
 
 /** The first task list, read until a line that is neither blank, indented nor a list item. */
-const taskList = (lines: readonly Line[]): Found | undefined => {
+const taskList = (lines: readonly Line[]): FoundStages | undefined => {
   const start = lines.findIndex((line) => TASK.test(line.text));
   const first = lines[start];
   if (!first) return undefined;
@@ -35,7 +25,8 @@ const taskList = (lines: readonly Line[]): Found | undefined => {
   for (const { text } of lines.slice(start)) {
     const task = TASK.exec(text);
     if (task) {
-      if (task[1] === indent) stages.push({ title: task[3]?.trim() ?? "", done: task[2] !== " " });
+      if (task[1] === indent)
+        stages.push({ title: shortTitle(task[3] ?? ""), done: task[2] !== " " });
     } else if (text.trim() !== "" && !/^\s/.test(text) && !LIST_ITEM.test(text)) {
       break;
     }
@@ -43,14 +34,19 @@ const taskList = (lines: readonly Line[]): Found | undefined => {
   return { line: first.number, stages };
 };
 
-/** A stage's title is its first cell that is more than a stage number. */
+/** A stage's title is its first cell that is more than a stage number or code. */
 const titleOf = (cells: readonly string[]): string =>
-  cells.find((cell) => cell !== "" && !STAGE_NUMBER.test(plain(cell))) ?? cells.find(Boolean) ?? "";
+  shortTitle(
+    cells.find((cell) => cell !== "" && !isBareNumber(stripMarkup(cell))) ??
+      cells.find(Boolean) ??
+      "",
+  );
 
-const stageTable = (lines: readonly Line[], config: StagesConfig): Found | undefined => {
+const stageTable = (lines: readonly Line[], config: StagesConfig): FoundStages | undefined => {
   const status = new Set(config.status.map((name) => name.toLowerCase()));
   for (const { header, rows } of parseTables(lines)) {
-    const column = header?.cells.findIndex((cell) => status.has(plain(cell))) ?? -1;
+    const column =
+      header?.cells.findIndex((cell) => status.has(stripMarkup(cell).toLowerCase())) ?? -1;
     if (!header || column < 0) continue;
     const stages = rows
       .filter((row) => row.cells.some(Boolean))
@@ -64,8 +60,8 @@ const stageTable = (lines: readonly Line[], config: StagesConfig): Found | undef
 };
 
 /**
- * Top-level stages of whichever comes first in the body, a task list or a table with a status
- * column; generated blocks, ledgers and fenced code are skipped.
+ * Stages of whichever comes first: a task list, a table with a status column, or coded headings
+ * or bold labels (`Э1`, `Stage 2`); generated blocks, ledgers and fenced code are skipped.
  */
 export const readStages = (
   body: readonly Line[],
@@ -82,7 +78,12 @@ export const readStages = (
       !fenced.has(line.number) &&
       !skipped.some(({ from, to }) => line.number >= from && line.number <= to),
   );
-  const found = [taskList(visible), stageTable(visible, config)]
+  const found = [
+    taskList(visible),
+    stageTable(visible, config),
+    stageHeadings(visible, config),
+    stageLabels(visible, config),
+  ]
     .filter((structure) => structure !== undefined)
     .toSorted((a, b) => a.line - b.line);
   return found[0]?.stages ?? [];

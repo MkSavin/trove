@@ -79,3 +79,12 @@ export const archivedStatuses = (config: Config, type: string | undefined): stri
   );
   return [config.archive.status, ...config.archive.finished, ...sent];
 };
+
+/** In the archive already, or with a status that belongs there. */
+export const isFinished = (
+  config: Config,
+  type: string | undefined,
+  status: string | undefined,
+  place: string,
+): boolean =>
+  place === "archive" || (status !== undefined && archivedStatuses(config, type).includes(status));

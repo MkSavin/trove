@@ -3,6 +3,7 @@ import type { Config, DocumentTypeConfig } from "../config/schema.ts";
 import {
   closedLedgerOf,
   hasCapability,
+  isFinished,
   keyOf,
   ledgerOf,
   typeConfig,
@@ -40,7 +41,7 @@ export type Document = {
   /** Present only for types with the matching capability and a marker in the text; closed items for `resolved-of`. */
   ledger: Ledger | undefined;
   prompt: PromptBody | undefined;
-  /** Empty unless the type has `stages` and the body a task list or a stage table. */
+  /** Empty unless the type has `stages`, the document is not finished and its body lists stages. */
   stages: readonly Stage[];
 };
 
@@ -67,19 +68,21 @@ export const parseDocument = ({ path, rel, text }: Source, config: Config): Docu
   const promptBlock = hasCapability(kind, "prompt-body")
     ? findBlock(lines, fenced, PROMPT_MARKER)
     : undefined;
+  const placed = placeOf(rel, config);
+  const status = meta.status === undefined ? undefined : keyOf(config.statuses, meta.status);
 
   return {
     path,
     rel,
     name: basename(rel),
-    ...placeOf(rel, config),
+    ...placed,
     text,
     lines,
     frontMatter,
     meta,
     type,
     typeConfig: kind,
-    status: meta.status === undefined ? undefined : keyOf(config.statuses, meta.status),
+    status,
     headings,
     links: findLinks(lines, fenced),
     statusLine: frontMatter ? readStatusLine(body, config.labels) : undefined,
@@ -88,9 +91,10 @@ export const parseDocument = ({ path, rel, text }: Source, config: Config): Docu
         ? readLedger(ledgerBlocks, rel, ledgerConfig, headings, hasCapability(kind, "resolved-of"))
         : undefined,
     prompt: promptBlock ? readPrompt(promptBlock, text) : undefined,
-    stages: hasCapability(kind, "stages")
-      ? readStages(body, fenced, ledgerBlocks, config.stages)
-      : [],
+    stages:
+      hasCapability(kind, "stages") && !isFinished(config, type, status, placed.place)
+        ? readStages(body, fenced, ledgerBlocks, config.stages)
+        : [],
   };
 };
 
