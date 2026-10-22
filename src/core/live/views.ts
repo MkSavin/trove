@@ -3,7 +3,7 @@ import type { Item } from "../document/ledger.ts";
 import { TroveError } from "../errors.ts";
 import { mergeFilters } from "../index/filters.ts";
 import type { StoreIndex } from "../index/index.ts";
-import { type Filters, itemMatches, selectDocuments, selectItems } from "../index/query.ts";
+import { type Filters, itemPasses, selectDocuments, selectItems } from "../index/query.ts";
 import { placementTable } from "../regulation/regulation.ts";
 import { cellText, columnLabel, groupTitle, type ReportRow } from "../reports/cells.ts";
 import { groupRows, renderCounts, sortRows, tableLines } from "../reports/section.ts";
@@ -145,7 +145,7 @@ const changes: View = (args, context) => {
   const rows = changeRows(
     context.index,
     baseline.value,
-    itemMatches(context.index, filtersOf(rest, context.base)),
+    itemPasses(context.index, filtersOf(rest, context.base)),
   );
   const note = moved ? [baseNote(config, moved), ""] : [];
   if (rows.length === 0) return [...note, config.labels.noChanges];
@@ -193,7 +193,7 @@ const trend: View = (args, context) => {
     by: rest.by,
     fallback,
     label: rest.label,
-    matches: itemMatches(context.index, filtersOf(rest, context.base)),
+    matches: itemPasses(context.index, filtersOf(rest, context.base)),
     outputDir: posix.dirname(context.rel),
   });
 };

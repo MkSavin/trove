@@ -118,8 +118,22 @@ export const itemMatches =
       fieldMatches(itemValues(item, field, index), itemColumn(item, field, index)?.enum, wanted),
     );
 
-/** Closed items are left out unless the filter names `state`. */
+const PLACE_FIELDS = ["type", "path", "id"];
+
+/** Items of an `apart` type, such as deferred work, pass only a filter that names where they are. */
+export const itemShown =
+  (index: StoreIndex, filters: Filters) =>
+  (item: Item): boolean =>
+    !index.byRel.get(item.document)?.typeConfig?.apart ||
+    PLACE_FIELDS.some((field) => Object.hasOwn(filters, field));
+
+export const itemPasses =
+  (index: StoreIndex, filters: Filters) =>
+  (item: Item): boolean =>
+    itemShown(index, filters)(item) && itemMatches(index, filters)(item);
+
+/** Closed items are left out unless the filter names `state`; see `itemShown` for the rest. */
 export const selectItems = (index: StoreIndex, filters: Filters): Item[] =>
   index.items.filter(
-    (item) => (!item.closed || Object.hasOwn(filters, STATE)) && itemMatches(index, filters)(item),
+    (item) => (!item.closed || Object.hasOwn(filters, STATE)) && itemPasses(index, filters)(item),
   );

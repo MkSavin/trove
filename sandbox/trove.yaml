@@ -78,6 +78,7 @@ types:
     purpose: "Our own work put off on purpose: what, why, where it came from and when to come back."
     capabilities: [ledger, status-line, freshness]
     initial: current
+    apart: true
     ledger:
       id: "DEF-{n}"
       columns:

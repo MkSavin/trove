@@ -92,6 +92,8 @@ const documentType = z.strictObject({
   freshness: z.int().positive().optional(),
   /** Its own ledger columns and statuses, e.g. for a debt list; the store's ledger otherwise. */
   ledger: ledger.optional(),
+  /** Its items stay out of queries, blocks and reports unless a filter names `type`, `path` or `id`. */
+  apart: z.boolean().default(false),
   /** A `resolved-of` type: `item close` moves closed items into this document's companion of it. */
   closeInto: z.string().optional(),
 });

@@ -30,7 +30,6 @@ const deferredSection = (config: Config): string[] => [
 /** Counts, open items by document, deferred work apart and documents in work, with places to write. */
 export const defaultBody = (config: Config): string => {
   const deferred = Object.hasOwn(config.types, DEFERRED);
-  const notDeferred = deferred ? ` type=!${DEFERRED}` : "";
   return [
     "<!-- write: one paragraph — what this summary covers, what it leaves out and what it was checked against -->",
     "",
@@ -38,12 +37,12 @@ export const defaultBody = (config: Config): string => {
     "",
     `## ${config.labels.summaryCounts}`,
     "",
-    `<!-- trove:counts by=priority${notDeferred} -->`,
+    `<!-- trove:counts by=priority -->`,
     "<!-- /trove:counts -->",
     "",
     `## ${config.labels.summaryItems}`,
     "",
-    `<!-- trove:items group=document${notDeferred} -->`,
+    `<!-- trove:items group=document -->`,
     "<!-- /trove:items -->",
     "",
     ...(deferred ? deferredSection(config) : []),

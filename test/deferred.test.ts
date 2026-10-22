@@ -152,24 +152,16 @@ describe("deferred work register", () => {
     ]);
   });
 
-  test("type=deferred finds the register; status=deferred finds deferred items anywhere", async () => {
+  test("the register stays apart: only a filter on type, path or id lists its items", async () => {
     const store = await sandbox();
     expect(ids(selectItems(store.index, { type: ["deferred"] }))).toEqual([
       "DEF-1",
       "DEF-2",
       "DEF-3",
     ]);
-    expect(ids(selectItems(store.index, { status: ["deferred"] }))).toEqual([
-      "DEF-1",
-      "DEF-2",
-      "DEF-3",
-      "MOB1-3",
-      "WEB1-5",
-    ]);
-    expect(ids(selectItems(store.index, { type: ["audit"], status: ["deferred"] }))).toEqual([
-      "MOB1-3",
-      "WEB1-5",
-    ]);
+    expect(ids(selectItems(store.index, { status: ["deferred"] }))).toEqual(["MOB1-3", "WEB1-5"]);
+    expect(ids(selectItems(store.index, {})).filter((id) => id.startsWith("DEF-"))).toEqual([]);
+    expect(ids(selectItems(store.index, { id: ["DEF-2"] }))).toEqual(["DEF-2"]);
     const registers = selectDocuments(store.index, { type: ["deferred"] }).map((doc) => doc.rel);
     expect(registers).toEqual(["DEFERRED.md"]);
   });

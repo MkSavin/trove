@@ -92,6 +92,7 @@ types:
     purpose: "Наша собственная работа, отложенная намеренно: что, почему, откуда пришла и когда к ней вернуться."
     capabilities: [ledger, status-line, freshness]
     initial: current
+    apart: true
     ledger:
       id: "DEF-{n}"
       columns:
