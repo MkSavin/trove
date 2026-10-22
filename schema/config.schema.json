@@ -150,6 +150,7 @@
         "count": "count",
         "summaryCounts": "By priority",
         "summaryItems": "Open items",
+        "summaryDeferred": "Deferred work",
         "summaryDocuments": "Documents in work",
         "branch": "branch",
         "lastCommit": "last commit",
@@ -197,6 +198,10 @@
         },
         "summaryItems": {
           "default": "Open items",
+          "type": "string"
+        },
+        "summaryDeferred": {
+          "default": "Deferred work",
           "type": "string"
         },
         "summaryDocuments": {

@@ -93,6 +93,14 @@ describe("summaries", () => {
     expect(text).not.toContain("| WEB1-1 |");
   });
 
+  test("the built-in layout lists deferred work in its own section only", async () => {
+    const text = await showSummary(store.index, {});
+    const [open, deferred] = text.split("## Deferred work");
+    expect(open).not.toContain("| DEF-");
+    expect(deferred).toContain("| DEF-1 |");
+    expect(deferred).toContain("| why | until |");
+  });
+
   test("a new summary is a dated document of the summary type", async () => {
     const plan = await newSummary(store.index, { kind: "outside-web", keep: true });
     expect(plan.changes.map((change) => change.rel)).toEqual([

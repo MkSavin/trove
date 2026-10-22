@@ -17,23 +17,36 @@ export type SummaryDraft = {
 
 const PLACEHOLDER = /\{\{(\w+)\}\}/g;
 
-/** Counts, open items by document and documents in work, with places for the model to write. */
-export const defaultBody = (config: Config): string =>
-  [
+const DEFERRED = "deferred";
+
+const deferredSection = (config: Config): string[] => [
+  `## ${config.labels.summaryDeferred}`,
+  "",
+  `<!-- trove:items type=${DEFERRED} columns=id,priority,owner,what,why,until -->`,
+  "<!-- /trove:items -->",
+  "",
+];
+
+/** Counts, open items by document, deferred work apart and documents in work, with places to write. */
+export const defaultBody = (config: Config): string => {
+  const deferred = Object.hasOwn(config.types, DEFERRED);
+  const notDeferred = deferred ? ` type=!${DEFERRED}` : "";
+  return [
     "<!-- write: one paragraph — what this summary covers, what it leaves out and what it was checked against -->",
     "",
     "<!-- write: what to look at first, with reasons -->",
     "",
     `## ${config.labels.summaryCounts}`,
     "",
-    "<!-- trove:counts by=priority -->",
+    `<!-- trove:counts by=priority${notDeferred} -->`,
     "<!-- /trove:counts -->",
     "",
     `## ${config.labels.summaryItems}`,
     "",
-    "<!-- trove:items group=document -->",
+    `<!-- trove:items group=document${notDeferred} -->`,
     "<!-- /trove:items -->",
     "",
+    ...(deferred ? deferredSection(config) : []),
     `## ${config.labels.summaryDocuments}`,
     "",
     '<!-- trove:documents place=work type=spec,plan,study as=list format="{document} — {status}" -->',
@@ -42,6 +55,7 @@ export const defaultBody = (config: Config): string =>
     "<!-- write: what is not verified yet -->",
     "",
   ].join("\n");
+};
 
 export const loadBody = async (
   root: string,

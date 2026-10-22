@@ -30,6 +30,7 @@ labels:
   count: пунктов
   summaryCounts: По приоритетам
   summaryItems: Открытые пункты
+  summaryDeferred: Отложенная работа
   summaryDocuments: Документы в работе
   branch: ветка
   lastCommit: последний коммит
