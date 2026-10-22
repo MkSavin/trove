@@ -26,6 +26,7 @@ A store is a git repository of Markdown documents for one project. Its rules liv
 - New document: `trove_create` with `type`, `topic` and required fields such as `scope`. Name, folder, series number and slug are chosen for you.
 - New finding: `trove_item` `{action: "add", document, values: {priority, owner, what, module?}}`, then write its section body under the heading trove added.
 - Fixed: `trove_item` `{action: "close", id, commit}`; add `archive: true` when trove says it was the last open item.
+- Put off on purpose: `trove_item` `{action: "defer", id, to: "DEFERRED", values: {why, until}}` moves the item into the register of the team's own deferred work (`until`: an id, a document or a date); without `to` it is only marked deferred in place. New deferred work: `{action: "add", document: "DEFERRED", values: {what, from, why, until}}`. Filter `type=deferred` for the register, `status=deferred` for every deferred item.
 - Re-checked against the code: `trove_update` `{document, field: "checked"}`; status changes go through `field: "status"`.
 - Repeatable re-check: `trove_update` `{document, field: "verify-cmd", value}`, a shell command that exits 0 while what the document describes still holds, e.g. `git -C {root:app} grep -q presence.v2 -- api/hub.go`. The user runs them with `trove check --verify`.
 - Finished plan or spec: `trove_transition` `{document, to: "archive"}`.

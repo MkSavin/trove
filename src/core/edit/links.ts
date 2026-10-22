@@ -10,7 +10,7 @@ export const resolveFrom = (rel: string, target: string): string =>
 const linkIn = (dir: string, target: string): string =>
   posix.relative(dir, target) || posix.basename(target);
 
-const linkFrom = (rel: string, target: string): string => linkIn(posix.dirname(rel), target);
+export const linkFrom = (rel: string, target: string): string => linkIn(posix.dirname(rel), target);
 
 /** Text copied from a document in `fromDir` into one in `toDir`, its relative links still working. */
 export const rebaseText = (text: string, fromDir: string, toDir: string): string =>

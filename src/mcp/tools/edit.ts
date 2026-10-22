@@ -9,7 +9,7 @@ import { setDocumentField } from "../../core/ops/doc-set.ts";
 import { requireDocument } from "../../core/ops/find.ts";
 import { addItem } from "../../core/ops/item-add.ts";
 import { closeItem } from "../../core/ops/item-close.ts";
-import { deferItem } from "../../core/ops/item-defer.ts";
+import { deferInto, deferItem } from "../../core/ops/item-defer.ts";
 import { moveItem } from "../../core/ops/item-move.ts";
 import { recheckItems } from "../../core/ops/item-recheck.ts";
 import type { Plan } from "../../core/ops/plan.ts";
@@ -33,6 +33,7 @@ type ItemArgs = {
   action: (typeof ITEM_ACTIONS)[number];
   id?: string | undefined;
   document?: string | undefined;
+  to?: string | undefined;
   values?: Record<string, string> | undefined;
   commit?: string | undefined;
   archive?: boolean | undefined;
@@ -63,7 +64,13 @@ const itemPlan = async (index: StoreIndex, args: ItemArgs): Promise<Plan> => {
         archive: args.archive,
       });
     case "defer":
-      return deferItem(index, required(args.id, "id"));
+      return args.to
+        ? deferInto(index, required(args.id, "id"), {
+            to: args.to,
+            values: args.values,
+            archive: args.archive,
+          })
+        : deferItem(index, required(args.id, "id"));
     case "move":
       return moveItem(index, required(args.id, "id"), required(args.document, "document"), {
         archive: args.archive,
@@ -178,12 +185,13 @@ export const registerEditTools = (server: McpServer, context: Context): void => 
     "trove_item",
     {
       description:
-        "Ledger items. add: document + values by column key (priority, owner, what, …), gets the next id and a section stub; in a ledger with several tables, values.section names the heading of the table.  close: id, optional commit sha and as (how it was closed: a key of the ledger's closed outcomes, e.g. fixed or dropped; the first by default); a type with closeInto moves the row and section into the audit's resolved companion; archive=true when it is the audit's last open item. defer: id. move: id + document (the target ledger), section for its table; archive=true when the source is left without open items. recheck: id or ids, drifted=true for every open item with drift=true, filters for matching ones; sets each item's own checked cell to the commit its code is at now (today when it spans no root or several), so drift starts over; unchanged=true keeps only items whose code reads the same as at their check, whitespace aside. Needs a checked column in the ledger.",
+        "Ledger items. add: document + values by column key (priority, owner, what, …), gets the next id and a section stub; in a ledger with several tables, values.section names the heading of the table.  close: id, optional commit sha and as (how it was closed: a key of the ledger's closed outcomes, e.g. fixed or dropped; the first by default); a type with closeInto moves the row and section into the audit's resolved companion; archive=true when it is the audit's last open item. defer: id marks it deferred in place; with to (a register of deferred work, e.g. DEFERRED) it moves there instead under the register's next id, from linking where it came from, values for why and until, archive=true as for move. move: id + document (the target ledger), section for its table; archive=true when the source is left without open items. recheck: id or ids, drifted=true for every open item with drift=true, filters for matching ones; sets each item's own checked cell to the commit its code is at now (today when it spans no root or several), so drift starts over; unchanged=true keeps only items whose code reads the same as at their check, whitespace aside. Needs a checked column in the ledger.",
       inputSchema: z.object({
         store: storeField,
         action: z.enum(ITEM_ACTIONS),
         id: z.string().optional(),
         document: z.string().optional(),
+        to: z.string().optional(),
         values: z.record(z.string(), z.string()).optional(),
         commit: z.string().optional(),
         archive: z.boolean().optional(),

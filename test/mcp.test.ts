@@ -63,7 +63,7 @@ describe("mcp tools", () => {
     expect((await call("trove_show", { ref: "WEB1-4" })).body).toStartWith(
       "audits/AUDIT_WEB_1.md:",
     );
-    expect((await call("trove_check", {})).data()).toMatchObject({ documents: 20, errors: 0 });
+    expect((await call("trove_check", {})).data()).toMatchObject({ documents: 21, errors: 0 });
     expect((await call("trove_prompt", { name: "PROMPT_AUDIT_WEB" })).body).toStartWith("# Task:");
     expect((await call("trove_regulation", { topic: "ledger" })).body).toContain(
       "| `owner` | owner | yes |",
@@ -132,6 +132,15 @@ describe("mcp tools", () => {
     const done = (await call("trove_item", { action: "close", id: "WEB1-3" })).data();
     expect(done.written).toBe(true);
     expect(await Bun.file(join(root, "BACKLOG.md")).text()).not.toContain("| WEB1-3 |");
+  });
+
+  test("defer with to moves an item into the register of deferred work", async () => {
+    const args = { action: "defer", id: "WEB1-4", to: "DEFERRED", values: { until: "WEB1-2" } };
+    const done = (await call("trove_item", args)).data();
+    expect(done.notes[0]).toBe("WEB1-4 → DEF-4");
+    const register = await Bun.file(join(root, "DEFERRED.md")).text();
+    expect(register).toContain("| deferred | Desktop notifications fire for the thread the user");
+    expect(register).toContain("| [WEB1-4](audits/AUDIT_WEB_1.md) |  | WEB1-2 |");
   });
 
   test("an item is rechecked once its ledger has a checked column", async () => {

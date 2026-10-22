@@ -87,6 +87,25 @@ types:
     fields: { produces: optional, model: optional }
   debt: { purpose: "Что планы обещали от других команд, а в коде этого ещё нет.", capabilities: [status-line, freshness], initial: current }
   risk: { purpose: "Допущения выкаченного кода, которые никто не проверил на живом устройстве.", capabilities: [status-line, freshness], initial: current }
+  deferred:
+    purpose: "Наша собственная работа, отложенная намеренно: что, почему, откуда пришла и когда к ней вернуться."
+    capabilities: [ledger, status-line, freshness]
+    initial: current
+    ledger:
+      id: "DEF-{n}"
+      columns:
+        - { key: id, label: id, required: true }
+        - { key: priority, label: P }
+        - { key: owner, label: владелец }
+        - { key: status, label: статус, required: true, enum: { deferred: отложено } }
+        - { key: what, label: что, required: true }
+        - { key: from, label: откуда }
+        - { key: why, label: почему }
+        - { key: until, label: до }
+        - { key: checked, label: сверено }
+      open: [deferred]
+      closed: { done: сделано, dropped: отказались, moved: перенесено }
+      note: "{status} {date}, {commit}"
   summary:
     purpose: "Срез хранилища на дату: сгенерированные блоки статуса плюс написанный анализ. Создаётся `trove summary new <вид>`; архивируется, когда его сменяет новый."
     capabilities: [status-line, freshness]

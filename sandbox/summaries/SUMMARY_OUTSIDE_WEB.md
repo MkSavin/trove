@@ -12,7 +12,7 @@ filter: path=!audits/AUDIT_WEB_1.md
 
 **Status:** current. Checked 2026-10-15.
 
-Everything open outside the web audit: the API and mobile ledgers and DEBT.md, with the specs, plans and studies still in work. Checked against the ledgers as of the date above; the web client has its own summary, [SUMMARY_WEB](SUMMARY_WEB.md).
+Everything open outside the web audit: the API and mobile ledgers, DEBT.md and DEFERRED.md, with the specs, plans and studies still in work. Checked against the ledgers as of the date above; the web client has its own summary, [SUMMARY_WEB](SUMMARY_WEB.md).
 
 Look first at API2-1: a refresh token that survives logout elsewhere is the one P0 in the store. MOB1-2 is next: messages that arrive only on open look like lost messages to users.
 
@@ -24,8 +24,8 @@ Look first at API2-1: a refresh token that survives logout elsewhere is the one 
 | — | 3 |
 | P0 | 1 |
 | P1 | 2 |
-| P2 | 3 |
-| P3 | 1 |
+| P2 | 4 |
+| P3 | 3 |
 <!-- /trove:counts -->
 
 ## Open items
@@ -38,6 +38,14 @@ Look first at API2-1: a refresh token that survives logout elsewhere is the one 
 | DEBT-I1 | — | Push delivery dashboard |
 | DEBT-S1 | — | Presence fan-out per team |
 | DEBT-S2 | — | Search index in its own service |
+
+**[DEFERRED](../DEFERRED.md)**
+
+| id | P | what is left |
+| -- | - | ------------ |
+| DEF-2 | P2 | Search results ranked by recency and author |
+| DEF-1 | P3 | Drafts follow the user across devices |
+| DEF-3 | P3 | Custom colour themes for a team |
 
 **[AUDIT_API_2](../audits/AUDIT_API_2.md)**
 

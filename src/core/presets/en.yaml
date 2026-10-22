@@ -61,6 +61,25 @@ types:
     fields: { produces: optional, model: optional }
   debt: { purpose: "What plans promised from other teams and the code does not do yet.", capabilities: [status-line, freshness], initial: current }
   risk: { purpose: "Assumptions of shipped code that nobody has verified on a real device yet.", capabilities: [status-line, freshness], initial: current }
+  deferred:
+    purpose: "Our own work put off on purpose: what, why, where it came from and when to come back."
+    capabilities: [ledger, status-line, freshness]
+    initial: current
+    ledger:
+      id: "DEF-{n}"
+      columns:
+        - { key: id, label: id, required: true }
+        - { key: priority, label: P, enum: [P0, P1, P2, P3, P4] }
+        - { key: owner, label: owner }
+        - { key: status, label: status, required: true, enum: [deferred] }
+        - { key: what, label: what, required: true }
+        - { key: from, label: from }
+        - { key: why, label: why }
+        - { key: until, label: until }
+        - { key: checked, label: checked }
+      open: [deferred]
+      closed: { done: done, dropped: dropped, moved: moved }
+      note: "{status} {date}, {commit}"
   summary:
     purpose: "A dated look at one slice of the store: generated status blocks plus written analysis. Create it with `trove summary new <kind>`; archive it when a newer one replaces it."
     capabilities: [status-line, freshness]

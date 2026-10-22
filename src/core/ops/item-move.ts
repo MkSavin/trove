@@ -1,6 +1,11 @@
+import { posix } from "node:path";
+import type { LedgerConfig } from "../config/schema.ts";
 import { labelOf } from "../config/vocabulary.ts";
+import { isBlankCell } from "../document/cell.ts";
 import { stemOf } from "../document/document.ts";
+import { withHeadingNote } from "../edit/heading.ts";
 import { appendRow, removeRow } from "../edit/ledger.ts";
+import { rebaseText } from "../edit/links.ts";
 import { applyPatches, eolOf, insert, replace } from "../edit/patch.ts";
 import { TroveError } from "../errors.ts";
 import type { StoreIndex } from "../index/index.ts";
@@ -15,13 +20,22 @@ import { thenPlan } from "./with-changes.ts";
 
 const HEADING_MARKS = /^#+/;
 
+type Renumber = {
+  id: string;
+  newId: string;
+  level: number;
+  /** A new heading note; the old one is recognised by the source ledger's vocabulary. */
+  status?: { label: string; ledger: LedgerConfig } | undefined;
+};
+
 /** The section under its new id, at the heading level the target document uses for items. */
-const renumber = (section: string, id: string, newId: string, level: number): string => {
+const renumber = (section: string, { id, newId, level, status }: Renumber): string => {
   const [heading = "", ...body] = section.split("\n");
   const renamed = heading
     .replace(idToken(id), (match) => match.replace(id, newId))
     .replace(HEADING_MARKS, "#".repeat(level));
-  return [renamed, ...body].join("\n");
+  const noted = status ? withHeadingNote(renamed, status.label, status.ledger) : renamed;
+  return [noted, ...body].join("\n");
 };
 
 const MOVED = "moved";
@@ -35,6 +49,13 @@ const movedRecord = async (index: StoreIndex, located: LocatedItem, newId: strin
   return recordClosed(index, located, type, { label, note: label }, { what });
 };
 
+export type MoveOptions = {
+  archive?: boolean | undefined;
+  section?: string | undefined;
+  /** Cells by column key that replace the item's own; a status also becomes the heading note. */
+  cells?: Readonly<Record<string, string>> | undefined;
+};
+
 /**
  * Moves an item to another ledger: its row and section leave the source, the target gets them
  * under its next id. Columns the target table lacks are dropped and reported.
@@ -43,7 +64,7 @@ export const moveItem = async (
   index: StoreIndex,
   id: string,
   targetName: string,
-  options: { archive?: boolean | undefined; section?: string | undefined } = {},
+  options: MoveOptions = {},
 ): Promise<Plan> => {
   const located = requireItem(index, id);
   const { doc: source, row, item } = located;
@@ -51,14 +72,19 @@ export const moveItem = async (
   const ledger = target.ledger?.config;
   if (!ledger) throw new TroveError(`${target.rel} has no ledger`);
   if (target.rel === source.rel) throw new TroveError(`${id} is already in ${target.rel}`);
+  const given = options.cells ?? {};
+  if (Object.values(given).some((value) => value.includes("|"))) {
+    throw new TroveError("a | inside a cell breaks the ledger table");
+  }
 
   const table = pickTable(target, { owner: item.values.owner, section: options.section });
   const prefix = idPrefix(ledger, target, table.section);
   const newId = `${prefix}${nextNumber(index, prefix)}`;
-  const cells = table.keys.map((key) =>
-    key === "id" ? newId : key ? (item.values[key] ?? "") : "",
+  const values: Readonly<Record<string, string>> = { ...item.values, ...given };
+  const cells = table.keys.map((key) => (key === "id" ? newId : key ? (values[key] ?? "") : ""));
+  const dropped = Object.keys(values).filter(
+    (key) => !table.keys.includes(key) && !isBlankCell(values[key]),
   );
-  const dropped = Object.keys(item.values).filter((key) => !table.keys.includes(key));
 
   const heading = itemHeading(source, id);
   const section = heading ? source.text.slice(heading.start, heading.end).trimEnd() : undefined;
@@ -70,7 +96,14 @@ export const moveItem = async (
   ]);
 
   const eol = eolOf(target.text);
-  const moved = section ? renumber(section, id, newId, sectionLevel(target)) : undefined;
+  const status = given.status ? { label: given.status, ledger: located.ledger } : undefined;
+  const moved = section
+    ? rebaseText(
+        renumber(section, { id, newId, level: sectionLevel(target), status }),
+        posix.dirname(source.rel),
+        posix.dirname(target.rel),
+      )
+    : undefined;
   const offset = sectionOffset(target, table);
   const targetText = applyPatches(target.text, [
     appendRow(target, table, cells),

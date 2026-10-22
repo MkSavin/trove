@@ -59,7 +59,7 @@ describe("migrate", () => {
     expect(result.uncommitted.toSorted()).toEqual(["AGENTS.md", "research/RESEARCH_NEW.md"]);
     expect(result.dropped).toEqual(["lint.mjs"]);
     expect(result.lost).toEqual([]);
-    expect(result.inventory.documents).toBe(21);
+    expect(result.inventory.documents).toBe(22);
     expect(result.diagnostics.filter((d) => d.severity === "error").map((d) => d.file)).toEqual([
       "research/RESEARCH_NEW.md",
     ]);

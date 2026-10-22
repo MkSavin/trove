@@ -1,7 +1,7 @@
 import { TroveError } from "../../core/errors.ts";
 import { addItem } from "../../core/ops/item-add.ts";
 import { closeItem } from "../../core/ops/item-close.ts";
-import { deferItem } from "../../core/ops/item-defer.ts";
+import { deferInto, deferItem } from "../../core/ops/item-defer.ts";
 import { moveItem } from "../../core/ops/item-move.ts";
 import { recheckItems } from "../../core/ops/item-recheck.ts";
 import { parse, parseFilters, parsePairs } from "../args.ts";
@@ -50,14 +50,28 @@ const itemClose: Command = {
 
 const itemDefer: Command = {
   name: "defer",
-  summary: "Mark an item deferred in its row and section",
-  usage: "trove item defer <id> [--dry-run]",
+  summary: "Mark an item deferred in place, or move it into a register of deferred work",
+  usage: "trove item defer <id> [--to DOCUMENT [column=value...] [--archive]] [--dry-run]",
   run: async (argv, io) => {
-    const { values, positionals } = parse(argv, OP_OPTIONS);
-    const [id] = positionals;
+    const { values, positionals } = parse(argv, {
+      ...OP_OPTIONS,
+      to: { type: "string" },
+      archive: { type: "boolean", default: false },
+    });
+    const [id, ...pairs] = positionals;
     if (!id) throw new TroveError("item defer needs an id");
+    if (!values.to && (pairs.length > 0 || values.archive)) {
+      throw new TroveError("column=value and --archive need --to");
+    }
     const store = await openFromFlags(values, io);
-    return runPlan(store, deferItem(store.index, id), io, values["dry-run"]);
+    const plan = values.to
+      ? await deferInto(store.index, id, {
+          to: values.to,
+          values: parsePairs(pairs),
+          archive: values.archive,
+        })
+      : deferItem(store.index, id);
+    return runPlan(store, plan, io, values["dry-run"]);
   },
 };
 

@@ -51,7 +51,22 @@ try {
     "owner=web",
     "what=No focus ring",
   ]);
+  await trove([
+    "item",
+    "add",
+    "AUDIT_WEB_CLIENT_1",
+    "priority=P2",
+    "owner=web",
+    "what=Drafts are lost on reload",
+  ]);
   await trove(["item", "close", "WEBCLIENT1-1", "--commit", "3f2a9c1"]);
+  await trove(["doc", "new", "deferred", "work put off", "--name", "DEFERRED", "--scope", "web/"]);
+  await trove(["item", "defer", "WEBCLIENT1-3", "--to", "DEFERRED", "until=2027-01-01"]);
+  await trove(["item", "add", "DEFERRED", "what=Offline search", "why=Sending comes first"]);
+  const deferred = await trove(["query", "items", "type=deferred", "--columns", "id,from,until"]);
+  if (!deferred.includes("DEF-1  [WEBCLIENT1-3](audits/AUDIT_WEB_CLIENT_1.md)  2027-01-01")) {
+    throw new Error(`the item was not deferred into DEFERRED.md:\n${deferred}`);
+  }
   await trove(["item", "close", "WEBCLIENT1-2"], 1);
   await trove(["item", "close", "WEBCLIENT1-2", "--archive"]);
   await trove(["doc", "new", "plan", "offline mode", "--scope", "web/"]);

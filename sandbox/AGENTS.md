@@ -26,6 +26,7 @@ Built from `purpose` of each type in `trove.yaml`.
 | `prompt` | `prompts/PROMPT_` | A large task for an AI agent that is run again, refined and handed to colleagues. |
 | `debt` | `store root` | What plans promised from other teams and the code does not do yet. |
 | `risk` | `store root` | Assumptions of shipped code that nobody has verified on a real device yet. |
+| `deferred` | `store root` | Our own work put off on purpose: what, why, where it came from and when to come back. |
 | `summary` | `summaries/SUMMARY_` | A dated look at one slice of the store: generated status blocks plus written analysis. Create it with `trove summary new <kind>`; archive it when a newer one replaces it. |
 | `backlog` | `store root` | Generated from other documents; never edited by hand. |
 <!-- /regulation:placement -->

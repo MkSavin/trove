@@ -1,6 +1,7 @@
 import type { Document } from "../../document/document.ts";
 import type { StoreIndex } from "../../index/index.ts";
 import { pendingRefs, refsOf, unknownRefs } from "../../index/waiting.ts";
+import { isIsoDate } from "../../text/dates.ts";
 import { defineRule, type Finding } from "../rule.ts";
 
 const DEFERRED = "deferred";
@@ -19,15 +20,20 @@ const deferrals = (doc: Document): { line: number; label: string; until: string 
 export const deferralLifted = defineRule({
   id: "deferral-lifted",
   level: "warn",
-  summary: "A deferral whose `until` is done: everything it waited for is closed or archived.",
+  summary:
+    "A deferral whose `until` is done: everything it waited for is closed, archived or past.",
   scope: "document",
   check: (doc, { index }) =>
     deferrals(doc)
       .filter(({ until }) => pendingRefs(index, until).length === 0)
-      .map(({ line, label, until }) => ({
-        line,
-        message: `${label} waited until ${refsOf(until).join(", ")}, which is done: take it up again`,
-      })),
+      .map(({ line, label, until }) => {
+        const refs = refsOf(until);
+        const done = refs.every(isIsoDate) ? "which has come" : "which is done";
+        return {
+          line,
+          message: `${label} waited until ${refs.join(", ")}, ${done}: take it up again`,
+        };
+      }),
 });
 
 const refFindings = (index: StoreIndex, line: number, label: string, value: string) =>
@@ -39,7 +45,7 @@ const refFindings = (index: StoreIndex, line: number, label: string, value: stri
 export const waitRefs = defineRule({
   id: "wait-refs",
   level: "warn",
-  summary: "`blocked_by` and `until` name items, documents or closed items that exist.",
+  summary: "`blocked_by` and `until` name dates, or items, documents or closed items that exist.",
   scope: "document",
   check: (doc, { index }) =>
     FIELDS.flatMap((field): Finding[] => [

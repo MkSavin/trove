@@ -20,12 +20,19 @@ First summary for the web team: seven open items in one audit, two of them P1, a
 | - | ----- |
 | P1 | 2 |
 | P2 | 3 |
-| P3 | 2 |
+| P3 | 4 |
 <!-- /trove:counts -->
 
 ## Open items
 
 <!-- trove:items owner=web group=document columns=id,priority,module,what -->
+**[DEFERRED](../DEFERRED.md)**
+
+| id | P | module | what is left |
+| -- | - | ------ | ------------ |
+| DEF-1 | P3 | — | Drafts follow the user across devices |
+| DEF-3 | P3 | — | Custom colour themes for a team |
+
 **[AUDIT_WEB_1](../audits/AUDIT_WEB_1.md)**
 
 | id | P | module | what is left |
