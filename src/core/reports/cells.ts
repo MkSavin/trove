@@ -3,7 +3,7 @@ import type { ReportColumn } from "../config/schema.ts";
 import { allLedgers } from "../config/vocabulary.ts";
 import type { Document } from "../document/document.ts";
 import type { Item } from "../document/ledger.ts";
-import { rebaseText } from "../edit/links.ts";
+import { rebaseText, relativeTo } from "../edit/links.ts";
 import { type Drift, itemDrift } from "../index/drift.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { DRIFT, documentField, itemField, itemValues } from "../index/query.ts";
@@ -20,7 +20,7 @@ const DOCUMENT_COLUMN = "document";
 export const isDocument = (row: ReportRow): row is Document => "rel" in row;
 
 const linkTo = (rel: string, outputDir: string): string =>
-  `[${basename(rel, ".md")}](${posix.relative(outputDir, rel)})`;
+  `[${basename(rel, ".md")}](${relativeTo(outputDir, rel)})`;
 
 /** A link while the document exists; an item that left the store keeps only its old name. */
 export const documentCell = (rel: string, index: StoreIndex, outputDir: string): string =>

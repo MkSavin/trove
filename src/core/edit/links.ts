@@ -7,8 +7,15 @@ import { applyPatches, type Patch, replace } from "./patch.ts";
 export const resolveFrom = (rel: string, target: string): string =>
   posix.normalize(posix.join(posix.dirname(rel), target));
 
+/** Deep enough for `../` above the store; keeps `posix.relative` off the process's working folder. */
+const ANCHOR = `/${"_/".repeat(32)}`;
+
+/** Path from one store-relative folder to a store-relative target, which may lie above the store. */
+export const relativeTo = (dir: string, target: string): string =>
+  posix.relative(posix.join(ANCHOR, dir), posix.join(ANCHOR, target));
+
 const linkIn = (dir: string, target: string): string =>
-  posix.relative(dir, target) || posix.basename(target);
+  relativeTo(dir, target) || posix.basename(target);
 
 export const linkFrom = (rel: string, target: string): string => linkIn(posix.dirname(rel), target);
 

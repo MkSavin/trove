@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { cp, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, parse } from "node:path";
 import { parseFilters } from "../src/cli/args.ts";
+import { rebaseText } from "../src/core/edit/links.ts";
 import { fieldMatches } from "../src/core/index/match.ts";
 import { queryRows } from "../src/core/index/rows.ts";
 import { refreshPlan } from "../src/core/ops/refresh.ts";
@@ -480,5 +481,18 @@ describe("carrying a summary over", () => {
       "<!-- write: last -->",
     ];
     expect(emptyWritePlaces(lines)).toEqual([2, 5]);
+  });
+});
+
+describe("rebasing copied links", () => {
+  test("a link above the store keeps its way out, wherever the process runs", () => {
+    const from = process.cwd();
+    process.chdir(parse(from).root);
+    try {
+      const text = "[M.cs](../../../app/src/M.cs#L52)";
+      expect(rebaseText(text, "audits/chats", ".")).toBe("[M.cs](../app/src/M.cs#L52)");
+    } finally {
+      process.chdir(from);
+    }
   });
 });
