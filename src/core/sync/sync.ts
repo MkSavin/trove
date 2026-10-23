@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import type { Config } from "../config/schema.ts";
 import { TroveError } from "../errors.ts";
 import type { Outcome } from "../ops/apply.ts";
@@ -60,10 +61,16 @@ const record = async (
   };
 };
 
-/** One commit per operation, by the store's `sync` mode; `off` leaves git alone. */
+/** One commit per operation, by the store's `sync` mode; `off` leaves git alone, and so does a draft. */
 export const syncOutcome = (store: Store, outcome: Outcome): Promise<SyncResult> => {
   if (store.config.sync === "off" || !outcome.written)
     return Promise.resolve(idle(store.config.sync));
+  if (outcome.draft) {
+    const name = posix.basename(outcome.draft);
+    return Promise.resolve(
+      idle(store.config.sync, [`draft ${name} not committed: fill it, then \`trove sync\``]),
+    );
+  }
   const paths = outcome.changes.flatMap((change) =>
     change.from ? [change.rel, change.from] : [change.rel],
   );

@@ -3,6 +3,7 @@ import { fieldSpecs } from "../config/vocabulary.ts";
 import { TroveError } from "../errors.ts";
 import type { StoreIndex } from "../index/index.ts";
 import { fillTemplate, type NewDocument, renderNewDocument } from "../templates/new-document.ts";
+import { withBody } from "../templates/with-body.ts";
 import { documentName, nameBase, placementOf, prefixedStem } from "./naming.ts";
 import type { Plan } from "./plan.ts";
 
@@ -12,6 +13,8 @@ export type NewDocumentInput = {
   /** File name stem without the folder prefix; derived from the topic when omitted. */
   name?: string | undefined;
   fields?: Readonly<Record<string, string>> | undefined;
+  /** Markdown after the title and status line; without it the document is a draft. */
+  body?: string | undefined;
 };
 
 export const STANDARD = new Set(["type", "status", "date", "checked"]);
@@ -69,15 +72,19 @@ export const newDocument = async (index: StoreIndex, input: NewDocumentInput): P
     date: index.today,
     fields,
   };
+  if (input.body?.trim() === "") throw new TroveError("the body is empty");
   const template = await customTemplate(index, input.type);
-  const text = template
+  const skeleton = template
     ? fillTemplate(template, document, Object.keys(specs))
     : renderNewDocument(index.config, document);
+  const text =
+    input.body === undefined ? skeleton : withBody(index.config, input.type, skeleton, input.body);
   const rel = folder ? `${folder}/${name}.md` : `${name}.md`;
   return {
     changes: [{ rel, text }],
     notes: [`created ${rel}`],
     message: `docs: add ${name}`,
     tolerate: ["lifecycle"],
+    draft: input.body === undefined ? rel : undefined,
   };
 };

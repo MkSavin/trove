@@ -9,4 +9,6 @@ export type Plan = {
   notes: readonly string[];
   /** Rules whose errors in the changed files do not block this operation. */
   tolerate?: readonly string[];
+  /** A new document still to be written: the operation's sync leaves it uncommitted. */
+  draft?: string | undefined;
 };

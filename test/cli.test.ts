@@ -99,4 +99,21 @@ describe("trove", () => {
     await run(["prompt", "PROMPT_GOOD", ...STORE], io);
     expect(io.stdout()).toBe("Проверь подсистему и заведи аудит.\nВторая строка задания.\n");
   });
+
+  test("doc new reads the body from a file or stdin", async () => {
+    const sandbox = ["--store", join(ROOT, "sandbox")];
+    const args = ["doc", "new", "plan", "search", "--scope", "api/", "--dry-run", ...sandbox];
+    const missing = captureIo();
+    expect(await run([...args, "--body-file", "nope.md"], missing)).toBe(2);
+    expect(missing.stderr()).toContain("no body file nope.md");
+
+    const child = Bun.spawn(
+      ["bun", join(ROOT, "src", "cli", "main.ts"), ...args, "--body-file", "-"],
+      { stdin: new Blob(["## Goal\n\nFind messages fast.\n"]), stdout: "pipe" },
+    );
+    expect(await child.exited).toBe(0);
+    const out = await new Response(child.stdout).text();
+    expect(out).toContain("A plans/PLAN_SEARCH.md");
+    expect(out).not.toContain("draft");
+  });
 });

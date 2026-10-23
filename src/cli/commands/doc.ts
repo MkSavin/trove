@@ -6,6 +6,7 @@ import { setDocumentField } from "../../core/ops/doc-set.ts";
 import { requireDocument } from "../../core/ops/find.ts";
 import { isIsoDate } from "../../core/text/dates.ts";
 import { parse, parsePairs } from "../args.ts";
+import { readBodyFile } from "../body-file.ts";
 import type { Command } from "../command.ts";
 import { defineGroup } from "../group.ts";
 import { OP_OPTIONS, runPlan } from "../ops.ts";
@@ -13,26 +14,30 @@ import { openFromFlags } from "../store.ts";
 
 const docNew: Command = {
   name: "new",
-  summary: "Create a document from the type's template",
-  usage: "trove doc new <type> <topic> [--name STEM] [--field key=value]... [--scope S]",
+  summary: "Create a document from the type's template, with its text from --body-file",
+  usage:
+    "trove doc new <type> <topic> [--body-file PATH|-] [--name STEM] [--field key=value]... [--scope S] [--dry-run]",
   run: async (argv, io) => {
     const { values, positionals } = parse(argv, {
       ...OP_OPTIONS,
       name: { type: "string" },
       scope: { type: "string" },
       field: { type: "string", multiple: true },
+      "body-file": { type: "string" },
     });
     const [type, ...words] = positionals;
     if (!type || words.length === 0) throw new TroveError("doc new needs a type and a topic");
 
     const fields = parsePairs(values.field ?? []);
     if (values.scope) fields.scope = values.scope;
+    const body = await readBodyFile(values["body-file"], io);
     const store = await openFromFlags(values, io);
     const plan = await newDocument(store.index, {
       type,
       topic: words.join(" "),
       name: values.name,
       fields,
+      body,
     });
     return runPlan(store, plan, io, values["dry-run"]);
   },

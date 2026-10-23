@@ -23,7 +23,7 @@ A store is a git repository of Markdown documents for one project. Its rules liv
 
 ## Write through trove
 
-- New document: `trove_create` with `type`, `topic` and required fields such as `scope`. Name, folder, series number and slug are chosen for you.
+- New document: `trove_create` with `type`, `topic`, required fields such as `scope`, and the whole text in `body` (`trove doc new … --body-file PATH|-`): everything after the title and status line, checked and committed in one step. Name, folder, series number and slug are chosen for you. Without `body` the document is a draft: written, not committed until `trove_sync`; write it up, then sync.
 - New finding: `trove_item` `{action: "add", document, values: {priority, owner, what, module?}}`, then write its section body under the heading trove added.
 - Fixed: `trove_item` `{action: "close", id, commit}`; add `archive: true` when trove says it was the last open item.
 - Put off on purpose: `trove_item` `{action: "defer", id, to: "DEFERRED", values: {why, until}}` moves the item into the register of the team's own deferred work (`until`: an id, a document or a date); without `to` it is only marked deferred in place. New deferred work: `{action: "add", document: "DEFERRED", values: {what, from, why, until}}`. Filter `type=deferred` for the register, `status=deferred` for every deferred item.
@@ -31,7 +31,7 @@ A store is a git repository of Markdown documents for one project. Its rules liv
 - Repeatable re-check: `trove_update` `{document, field: "verify-cmd", value}`, a shell command that exits 0 while what the document describes still holds, e.g. `git -C {root:app} grep -q presence.v2 -- api/hub.go`. The user runs them with `trove check --verify`.
 - Finished plan or spec: `trove_transition` `{document, to: "archive"}`.
 - Wrong type, such as research that turned into a plan of work: `trove_transition` `{document, to: "type", type: "plan"}`. Which type fits: `trove_regulation` `placement`.
-- New summary: `trove_create` `{kind, topic}` (`trove summary new <kind>`). Its `<!-- trove:… -->` blocks are generated; write up every `<!-- write: … -->` place from what the blocks show and the documents they link, under its marker line: keep the line, the next summary carries the text over by it.
+- New summary: `trove_create` `{kind, topic}` (`trove summary new <kind>`). Its `<!-- trove:… -->` blocks are generated; write up every `<!-- write: … -->` place from what the blocks show and the documents they link, under its marker line: keep the line, the next summary carries the text over by it. It stays an uncommitted draft while a place is empty: `trove_sync` once it is written.
 - Never edit inside `<!-- trove:… -->` blocks: change the documents they come from, or the block's options.
 - Use `dryRun: true` when unsure; read the diff before writing.
 - A refused edit lists the errors it would add. Fix the cause; do not hand-edit around it.

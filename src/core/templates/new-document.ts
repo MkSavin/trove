@@ -17,7 +17,7 @@ export type NewDocument = {
 
 const PLACEHOLDER = /\{\{(\w+)\}\}/g;
 
-const ledgerSection = (config: Config, type: string): string[] => {
+export const ledgerSection = (config: Config, type: string): string[] => {
   const ledger = ledgerOf(config, config.types[type]);
   if (!ledger) return [];
   const labels = ledger.columns.map((column) => column.label);

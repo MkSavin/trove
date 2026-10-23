@@ -16,6 +16,7 @@ export type Outcome = {
   notes: readonly string[];
   message: string;
   written: boolean;
+  draft: string | undefined;
 };
 
 /** Errors the change adds; a moved file's old errors count under its new path. */
@@ -77,5 +78,12 @@ export const applyPlan = async (
 
   const written = introduced.length === 0 && !dryRun;
   if (written) await write(store.root, changes);
-  return { changes, introduced, notes: plan.notes, message: plan.message, written };
+  return {
+    changes,
+    introduced,
+    notes: plan.notes,
+    message: plan.message,
+    written,
+    draft: plan.draft,
+  };
 };

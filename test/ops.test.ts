@@ -292,6 +292,37 @@ describe("doc operations", () => {
     expect(change?.rel).toBe("plans/PLAN_SYNC.md");
   });
 
+  test("new with a body puts it after the title and status line; without one it is a draft", async () => {
+    const store = await sandbox();
+    const input = { type: "plan", topic: "search rollout", fields: { scope: "api/" } };
+    expect((await newDocument(store.index, input)).draft).toBe("plans/PLAN_SEARCH_ROLLOUT.md");
+
+    const body = "\r\n## Goal\r\n\r\nIndex messages for search.\r\n\r\n";
+    const plan = await newDocument(store.index, { ...input, body });
+    expect(plan.draft).toBeUndefined();
+    expect(plan.changes[0]?.text).toEndWith(
+      "# PLAN_SEARCH_ROLLOUT — search rollout\n\n**Status:** not started. Checked 2026-10-15.\n\n## Goal\n\nIndex messages for search.\n",
+    );
+    expect((await applyPlan(store, plan)).introduced).toEqual([]);
+    await expect(newDocument(store.index, { ...input, body: " \n" })).rejects.toThrow(/empty/);
+  });
+
+  test("a body's own title replaces the template's; an audit body gets the ledger it lacks", async () => {
+    const store = await sandbox();
+    const plan = await newDocument(store.index, {
+      type: "audit",
+      topic: "web",
+      fields: { scope: "web/" },
+      body: "# AUDIT_WEB_2 — web client, second pass\n\nWhat was read and why.\n",
+    });
+    const text = plan.changes[0]?.text ?? "";
+    expect(text).toContain(
+      "# AUDIT_WEB_2 — web client, second pass\n\n**Status:** open. Checked 2026-10-15.\n\n## Ledger\n",
+    );
+    expect(text).toEndWith("<!-- /ledger -->\n\nWhat was read and why.\n");
+    expect((await applyPlan(store, plan)).introduced).toEqual([]);
+  });
+
   test("new transliterates Cyrillic topics and keeps the first words of long ones", () => {
     expect(nameBase("Переезд архива на trove: чего не хватает")).toBe(
       "PEREEZD_ARKHIVA_NA_TROVE_CHEGO_NE_KHVATAET",

@@ -2,15 +2,18 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { cp, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { git } from "../src/core/git/git.ts";
 import { applyPlan } from "../src/core/ops/apply.ts";
 import { archivePlan } from "../src/core/ops/doc-archive.ts";
+import { newDocument } from "../src/core/ops/doc-new.ts";
 import { setDocumentField } from "../src/core/ops/doc-set.ts";
 import { closeItem } from "../src/core/ops/item-close.ts";
 import type { Plan } from "../src/core/ops/plan.ts";
 import { prepareRepository } from "../src/core/store/hook.ts";
 import { syncOutcome, syncStore } from "../src/core/sync/sync.ts";
 import { openStore, type Store } from "../src/index.ts";
+import { createServer } from "../src/mcp/server.ts";
 import { ROOT, TODAY } from "./helpers.ts";
 
 const IDENTITY = {
@@ -167,6 +170,74 @@ describe("sync after an operation", () => {
     await Bun.write(config, (await config.text()).replace("sync: off", "sync: commit"));
     const result = await run(root, (s) => setDocumentField(s.index, "RISKS", "checked", TODAY));
     expect(result.warnings[0]).toMatch(/not the root of a git repository/);
+  });
+});
+
+describe("new documents", () => {
+  const input = { type: "plan", topic: "search rollout", fields: { scope: "api/" } };
+  const rel = "plans/PLAN_SEARCH_ROLLOUT.md";
+  const shown = async (root: string, ref = "HEAD") =>
+    (await git(root, ["show", "--name-only", "--format=", ref])).out.split("\n");
+
+  test("one without a body is a draft: written, left out of the commit until trove sync", async () => {
+    const root = await storeWithRemote("push");
+    const result = await run(root, (s) => newDocument(s.index, input));
+    expect(result).toMatchObject({ commit: undefined, pushed: false });
+    expect(result.warnings).toEqual([
+      "draft PLAN_SEARCH_ROLLOUT.md not committed: fill it, then `trove sync`",
+    ]);
+    expect(await Bun.file(join(root, rel)).exists()).toBe(true);
+    expect((await log(root))[0]).toBe("docs: base");
+
+    const synced = await syncStore(await open(root));
+    expect(synced.pushed).toBe(true);
+    expect(await shown(root)).toContain(rel);
+    expect((await git(root, ["status", "--porcelain"])).out).toBe("");
+  });
+
+  test("one with a body is a single pushed commit with its text", async () => {
+    const root = await storeWithRemote("push");
+    const body = "## Goal\n\nIndex messages for search.\n";
+    const result = await run(root, (s) => newDocument(s.index, { ...input, body }));
+    expect(result).toMatchObject({ pushed: true, warnings: [] });
+    expect((await log(remote, "main")).slice(0, 2)).toEqual([
+      "docs: add PLAN_SEARCH_ROLLOUT",
+      "docs: base",
+    ]);
+    expect(await shown(remote, "main")).toContain(rel);
+    expect((await git(remote, ["show", `main:${rel}`])).out).toContain(
+      "Index messages for search.",
+    );
+    expect((await git(root, ["status", "--porcelain"])).out).toBe("");
+  });
+
+  test("trove_create commits a body and reports a draft", async () => {
+    const root = await storeWithRemote("push");
+    const [clientEnd, serverEnd] = InMemoryTransport.createLinkedPair();
+    await createServer({ cwd: root }).connect(serverEnd);
+    const client = new Client({ name: "test", version: "1.0.0" });
+    await client.connect(clientEnd);
+    const create = async (args: Record<string, unknown>) => {
+      const result = (await client.callTool({ name: "trove_create", arguments: args })) as {
+        content: { text?: string }[];
+      };
+      return JSON.parse(result.content[0]?.text ?? "{}");
+    };
+    try {
+      const full = await create({ ...input, body: "## Goal\n\nIndex messages for search.\n" });
+      expect(full.sync).toMatchObject({ pushed: true, warnings: [] });
+      expect((await log(remote, "main"))[0]).toBe("docs: add PLAN_SEARCH_ROLLOUT");
+
+      const draft = await create({ ...input, topic: "search cleanup" });
+      expect(draft.written).toBe(true);
+      expect(draft.sync).toEqual({
+        pushed: false,
+        warnings: ["draft PLAN_SEARCH_CLEANUP.md not committed: fill it, then `trove sync`"],
+      });
+      expect((await log(remote, "main"))[0]).toBe("docs: add PLAN_SEARCH_ROLLOUT");
+    } finally {
+      await client.close();
+    }
   });
 });
 

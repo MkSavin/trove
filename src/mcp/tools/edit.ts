@@ -91,13 +91,19 @@ export const registerEditTools = (server: McpServer, context: Context): void => 
     "trove_create",
     {
       description:
-        "Create a document from its type's template: folder, prefix, next series number and slug are chosen for you. Required header fields go in fields, e.g. {scope: 'web/'}. With kind, a summary of that configured kind instead: generated blocks filled, <!-- write: … --> places left for you to write up under their line, which stays; filters narrow it further.",
+        "Create a document from its type's template: folder, prefix, next series number and slug are chosen for you. Required header fields go in fields, e.g. {scope: 'web/'}. Pass the whole text in body: it is checked and committed in one step; without body the document is a draft, written but not committed until trove_sync. With kind, a summary of that configured kind instead: generated blocks filled, <!-- write: … --> places left for you to write up under their line, which stays; filters narrow it further. A summary with an empty write place is a draft too.",
       inputSchema: z.object({
         store: storeField,
         type: z.string(),
         topic: z.string().describe("Human title; also the file name unless name is given"),
         name: z.string().optional().describe("File name stem without prefix, e.g. WEB_CLIENT"),
         fields: z.record(z.string(), z.string()).optional(),
+        body: z
+          .string()
+          .optional()
+          .describe(
+            "Markdown after the template's title and status line; a leading # title replaces the template's. A ledger or prompt marker the type needs is added when missing. Not for a summary",
+          ),
         kind: z
           .string()
           .optional()
@@ -117,20 +123,24 @@ export const registerEditTools = (server: McpServer, context: Context): void => 
       }),
       annotations: EDIT,
     },
-    guarded(async ({ store, type, topic, name, fields, kind, filters, from, keep, dryRun }) => {
-      const opened = await openFor(context, store);
-      const plan = kind
-        ? await newSummary(opened.index, {
-            kind,
-            title: topic,
-            name,
-            filters: asFilters(filters),
-            from,
-            keep,
-          })
-        : await newDocument(opened.index, { type, topic, name, fields });
-      return runPlanTool(opened, plan, dryRun);
-    }),
+    guarded(
+      async ({ store, type, topic, name, fields, body, kind, filters, from, keep, dryRun }) => {
+        if (kind && body !== undefined)
+          throw new TroveError("body is for documents, not summaries");
+        const opened = await openFor(context, store);
+        const plan = kind
+          ? await newSummary(opened.index, {
+              kind,
+              title: topic,
+              name,
+              filters: asFilters(filters),
+              from,
+              keep,
+            })
+          : await newDocument(opened.index, { type, topic, name, fields, body });
+        return runPlanTool(opened, plan, dryRun);
+      },
+    ),
   );
 
   server.registerTool(

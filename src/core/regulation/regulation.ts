@@ -181,7 +181,7 @@ const WORKFLOW = `# Working with the store
 - Read slices, not files: query items or documents with filters, then show one item or one section.
 - Items with \`drift=true\` point at code that changed after they or their document were checked: they may already be fixed, re-check them first. \`drift=file\` means only other lines of a file they name changed; \`drift=unknown\` that the change could not be checked. Once re-checked, \`item recheck\` moves the item's \`checked\` to the current commit.
 - Edit through the tools, not by rewriting files: they patch only their own lines, refuse changes that add errors and rebuild generated reports in the same step.
-- Create documents from their type's template; add items to a ledger instead of typing rows; close an item when the fix is merged, with its commit.
+- Create documents from their type's template with their whole text, so one checked commit carries it; a document created without text is a draft, left uncommitted until the next sync. Add items to a ledger instead of typing rows; close an item when the fix is merged, with its commit.
 - An audit whose last open item closes moves to the archive in the same step.
 - Work put off on purpose moves into the store's register of deferred work, when it has one, with \`item defer <id> --to <register>\` and why and until; a plain \`item defer\` only marks it in place.
 - After a manual edit, run the check and then sync, so the reports and the commit stay in step.

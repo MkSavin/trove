@@ -109,6 +109,7 @@ describe("summaries", () => {
     ]);
     expect(plan.changes[0]?.text).toContain("type: summary\nstatus: current");
     expect(plan.changes[0]?.text).toContain("](../audits/AUDIT_API_2.md)");
+    expect(plan.draft).toBe("summaries/SUMMARY_OUTSIDE_WEB_2026-10-15.md");
   });
 
   test("a new summary archives the one it replaces, which names it", async () => {

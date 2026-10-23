@@ -69,7 +69,13 @@ try {
   }
   await trove(["item", "close", "WEBCLIENT1-2"], 1);
   await trove(["item", "close", "WEBCLIENT1-2", "--archive"]);
-  await trove(["doc", "new", "plan", "offline mode", "--scope", "web/"]);
+  const body = join(workspace, "plan.md");
+  await Bun.write(body, "## Goal\n\nSends survive going offline.\n");
+  await trove(["doc", "new", "plan", "offline mode", "--scope", "web/", "--body-file", body]);
+  const plan = await Bun.$`git show main:plans/PLAN_OFFLINE_MODE.md`.cwd(remote).env(env).quiet();
+  if (!plan.text().includes("Sends survive going offline.")) {
+    throw new Error("the plan's body was not pushed with it");
+  }
   await trove(["check"]);
   await trove([
     "doc",

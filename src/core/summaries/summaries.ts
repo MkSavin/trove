@@ -18,8 +18,10 @@ import type { Plan } from "../ops/plan.ts";
 import { thenPlan, withChanges } from "../ops/with-changes.ts";
 import { refreshGenerated } from "../reports/embeds.ts";
 import { compareText } from "../text/compare.ts";
+import { splitLines } from "../text/lines.ts";
 import { carryWritten } from "./carry.ts";
 import { defaultBody, loadBody, renderDraft } from "./template.ts";
+import { emptyWritePlaces } from "./write-places.ts";
 
 const LATEST = "latest";
 const SUCCESSOR = "superseded_by";
@@ -158,7 +160,8 @@ export const newSummary = async (index: StoreIndex, request: SummaryRequest): Pr
   const after = await withGitData(withChanges(index, plan.changes), [{ rel, text: draft }]);
   const text = refreshGenerated(draft, rel, after);
   const changes = plan.changes.map((change) => (change.rel === rel ? { ...change, text } : change));
-  return { ...plan, changes, message: `docs: add ${stem}` };
+  const unwritten = emptyWritePlaces(splitLines(text).map((line) => line.text)).length > 0;
+  return { ...plan, changes, message: `docs: add ${stem}`, draft: unwritten ? rel : undefined };
 };
 
 export const showSummary = async (index: StoreIndex, request: SummaryRequest): Promise<string> => {
