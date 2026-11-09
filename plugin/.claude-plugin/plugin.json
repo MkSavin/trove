@@ -8,6 +8,11 @@
   "homepage": "https://github.com/MkSavin/trove",
   "repository": "https://github.com/MkSavin/trove",
   "license": "MIT",
-  "keywords": ["documentation", "audits", "markdown", "mcp"],
-  "version": "0.1.0"
+  "keywords": [
+    "documentation",
+    "audits",
+    "markdown",
+    "mcp"
+  ],
+  "version": "0.2.0"
 }
