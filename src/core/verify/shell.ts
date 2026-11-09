@@ -4,7 +4,7 @@ export type ShellResult = { code: number; timedOut: boolean; output: string; ms:
 
 export type ShellOptions = { cwd: string; timeoutMs: number };
 
-/** A child the command left behind may hold the pipe open: output is read only this long after exit. */
+// @anchor WORKAROUND:child-holds-pipe A child the command left behind may hold the pipe open past its exit.
 const DRAIN_GRACE_MS = 200;
 
 const collect = async (
@@ -23,7 +23,7 @@ const collect = async (
   return Buffer.concat(chunks).toString("utf8");
 };
 
-/** Runs through Bun's own shell, the same on every OS; a compiled trove acts as `bun` under `BUN_BE_BUN`. */
+/** Runs through Bun's own shell, the same on every OS. */
 export const runShell = async (
   command: string,
   { cwd, timeoutMs }: ShellOptions,
@@ -31,7 +31,9 @@ export const runShell = async (
   const started = performance.now();
   const child = Bun.spawn([process.execPath, "exec", command], {
     cwd,
+    // @anchor WORKAROUND:compiled-bun-be-bun A compiled trove's execPath is trove itself, not bun.
     env: { ...gitEnv(), BUN_BE_BUN: "1" },
+    // @anchor WORKAROUND:child-stdin-closed A command must not read the MCP server's protocol stream.
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",

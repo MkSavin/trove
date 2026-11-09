@@ -51,6 +51,7 @@ describe("config", () => {
     expect(config.rules["unknown-field"]?.since).toBe("2026-09-01");
   });
 
+  // @anchor INV:config/broken-references
   test("rejects unknown keys and broken cross-references", () => {
     expect(() => parseConfig(`${MINIMAL}colour: red`, "inline")).toThrow(/colour/);
     expect(() =>
@@ -61,7 +62,8 @@ describe("config", () => {
     );
   });
 
+  // @anchor INV:config/yaml-origin
   test("reports YAML syntax errors with the origin", () => {
-    expect(() => parseConfig("regulation: [1", "store/trove.yaml")).toThrow(/store\/trove.yaml/);
+    expect(() => parseConfig("regulation: [1", "store/trove.yaml")).toThrow(/store\/trove.yaml: /);
   });
 });

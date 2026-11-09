@@ -27,7 +27,7 @@ export const claudeUserPaths = (
     : { config: join(home, ".claude.json"), skillsDir: join(home, ".claude", "skills") };
 };
 
-/** Claude Code keys projects by their root with forward slashes, also on Windows. */
+// @anchor WORKAROUND:claude-project-key Claude Code keys projects with forward slashes, also on Windows.
 export const projectKey = (projectRoot: string): string => toPosix(projectRoot);
 
 type ClaudeJson = { projects?: Record<string, McpJson> };

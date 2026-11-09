@@ -486,6 +486,7 @@ describe("carrying a summary over", () => {
 });
 
 describe("rebasing copied links", () => {
+  // @anchor INV:summaries/link-above
   test("a link above the store keeps its way out, wherever the process runs", () => {
     const from = process.cwd();
     process.chdir(parse(from).root);

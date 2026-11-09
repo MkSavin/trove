@@ -103,6 +103,7 @@ describe("verify-cmd", () => {
     expect(outcomes(present.verify)).toEqual({ [SPEC]: "ok" });
   });
 
+  // @anchor INV:verify/closed-stdin
   test("runs with stdin closed and without git hook variables", async () => {
     const store = await sandbox({ [SPEC]: 'cat && echo "dir=$GIT_DIR" && exit 1' });
     process.env.GIT_DIR = join(store, "elsewhere");
@@ -115,6 +116,7 @@ describe("verify-cmd", () => {
     }
   });
 
+  // @anchor INV:verify/stops-timeout
   test("stops a command at the timeout", async () => {
     const store = await sandbox({ [SPEC]: 'bun -e "await Bun.sleep(20000)"' });
     const started = performance.now();
@@ -156,6 +158,7 @@ describe("verify-cmd", () => {
 });
 
 describe("expandCommand", () => {
+  // @anchor INV:verify/forward-slashes
   test("writes paths with forward slashes and reports the first problem", async () => {
     const store = await open(await sandbox({}));
     const harbor = join(store.root, "..", "harbor");

@@ -15,7 +15,7 @@ export const verifyCommandOf = (doc: Document): string | undefined =>
 
 const PLACEHOLDER = /\{(store|root:([^}]+))\}/g;
 
-/** Forward slashes: Bun's shell reads a backslash as an escape, and Windows accepts both. */
+// @anchor WORKAROUND:bun-shell-backslash Bun's shell reads a backslash as an escape; Windows accepts both.
 const shellPath = (path: string): string => toPosix(path);
 
 /** Fills `{store}` and `{root:<name>}` with absolute paths; the first root that is unknown or absent wins. */

@@ -15,6 +15,7 @@ const baseFilters = (text: string) =>
 /**
  * Rebuilds every closed `trove:` block of a text from the index; blocks that cannot be built stay
  * as they are and are returned as problems. Blocks whose git data was not read just stay.
+ * @anchor DOC:live-views
  */
 export const fillLiveBlocks = (
   text: string,

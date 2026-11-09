@@ -12,7 +12,7 @@ export const isRepositoryRoot = async (root: string): Promise<boolean> => {
   return top !== undefined && samePath(top, root);
 };
 
-/** On disk or known to git; a never-committed file moved away is neither and would fail `git add`. */
+// @anchor WORKAROUND:git-add-unknown-path git add fails the whole call on a never-committed path gone from disk.
 const stageable = async (root: string, paths: readonly string[]): Promise<string[]> => {
   const known = await git(root, ["ls-files", "-z", "--cached", "--", ...paths]);
   const tracked = new Set(known.out.split("\0").filter(Boolean));
@@ -41,6 +41,7 @@ const conflicted = async (root: string): Promise<string[]> =>
 export type Pushed = { pushed: boolean; warning: string | undefined };
 
 const MAX_STEPS = 100;
+// @anchor WORKAROUND:rebase-opens-editor A rebase step would wait for an editor nobody answers.
 const NO_EDITOR = ["-c", "core.editor=true"];
 
 /**

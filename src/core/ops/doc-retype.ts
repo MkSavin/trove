@@ -12,7 +12,7 @@ import type { Change, Plan } from "./plan.ts";
 
 const TITLE = /^# /;
 
-/** The stem without the old type's prefix, under the new type's prefix: RESEARCH_X → PLAN_X. */
+/** The stem without the old type's prefix, under the new type's prefix: `RESEARCH_X` → `PLAN_X`. */
 const renamed = (index: StoreIndex, doc: Document, type: string): string => {
   const stem = stemOf(doc);
   const old = doc.type ? placementOf(index.config, doc.type).prefix : "";

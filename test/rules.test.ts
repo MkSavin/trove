@@ -9,6 +9,7 @@ const pairs = (severity: string) =>
   diagnostics.filter((d) => d.severity === severity).map((d) => `${d.file} ${d.rule}`);
 
 describe("built-in rules on the fixture store", () => {
+  // @anchor INV:rules/planted-errors
   test("report exactly the planted errors", () => {
     expect(pairs("error")).toEqual([
       ".archive/audits/AUDIT_OPEN_1.md lifecycle",
@@ -104,6 +105,7 @@ describe("front-matter-yaml", () => {
     return runRules([frontMatterYaml], indexDocuments(store.root, store.config, [doc], TODAY));
   };
 
+  // @anchor INV:rules/yaml-field
   test("points at the field whose value needs quotes", () => {
     expect(check("verify: step 2: a test exists")).toMatchObject([{ line: 3, severity: "warn" }]);
     expect(check('verify: "step 2: a test exists"')).toEqual([]);

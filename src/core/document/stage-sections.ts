@@ -16,7 +16,7 @@ const TRAILING_MARK = /\s*[✅✓✔]️?$/u;
 const LABEL = /^\s*(?:(?:[-*+]|\d+[.)])\s+)?\*\*(.+?)\*\*(.*)$/;
 const HEADING = /^#{1,6}\s/;
 
-/** `[x] Э1. Catalog (merged)`, `Stage 2 — Search ✅` or `Б3 — merged.` */
+/** `[x] E1. Catalog (merged)`, `Stage 2 — Search ✅` or `B3 — merged.` */
 const codedTitle = (raw: string, done: readonly string[]): CodedTitle | undefined => {
   const text = stripMarkup(raw);
   const lead = LEADING_MARK.exec(text);
@@ -63,7 +63,7 @@ const headingRun = (
   return [];
 };
 
-/** `### Э1. Catalog`, done by a mark in the heading or a `Status: merged` line just under it. */
+/** `### E1. Catalog`, done by a mark in the heading or a `Status: merged` line just under it. */
 export const stageHeadings = (
   lines: readonly Line[],
   config: StagesConfig,
@@ -109,7 +109,7 @@ const labelledParagraphs = (lines: readonly Line[], config: StagesConfig): Label
     return [{ line: line.number, paragraph, ...label }];
   });
 
-/** `**Б1.** text … (merged)` or `**Б1 — merged.** text`, in a row of labels sharing a code prefix. */
+/** `**B1.** text … (merged)` or `**B1 — merged.** text`, in a row of labels sharing a code prefix. */
 export const stageLabels = (
   lines: readonly Line[],
   config: StagesConfig,

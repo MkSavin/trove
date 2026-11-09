@@ -152,6 +152,7 @@ describe("deferred work register", () => {
     ]);
   });
 
+  // @anchor INV:deferred/register-apart
   test("the register stays apart: only a filter on type, path or id lists its items", async () => {
     const store = await sandbox();
     expect(ids(selectItems(store.index, { type: ["deferred"] }))).toEqual([

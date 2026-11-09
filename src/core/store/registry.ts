@@ -23,8 +23,6 @@ export const troveHome = (): string => process.env.TROVE_HOME ?? join(homedir(),
 
 const registryFile = () => Bun.file(join(troveHome(), "registry.yaml"));
 
-/** Windows paths differ only by case for the same folder. */
-
 export const readRegistry = async (): Promise<Registry> => {
   const file = registryFile();
   if (!(await file.exists())) return { projects: [] };

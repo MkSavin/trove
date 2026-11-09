@@ -18,6 +18,7 @@ const findingsOf = (
 const isExempt = (doc: Document | undefined, since: string | undefined): boolean =>
   since !== undefined && doc !== undefined && (doc.meta.date ?? "") < since;
 
+/** @anchor DOC:rules */
 export const runRules = (rules: readonly Rule[], index: StoreIndex): Diagnostic[] => {
   const ctx: RuleContext = { index, config: index.config };
   const headed = index.documents.filter((doc) => doc.frontMatter);

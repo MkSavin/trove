@@ -80,6 +80,7 @@ describe("sync after an operation", () => {
     expect((await log(remote, "main"))[0]).toBe("docs: base");
   });
 
+  // @anchor INV:sync/never-committed
   test("archiving a document never committed commits its new place", async () => {
     const root = await storeWithRemote("commit");
     await git(root, ["rm", "--quiet", "--cached", "plans/PLAN_OFFLINE_MODE.md"]);
@@ -115,6 +116,7 @@ describe("sync after an operation", () => {
     expect(backlog).not.toContain("| MOB1-1 |");
   });
 
+  // @anchor INV:sync/report-conflict
   test("a conflict in a generated report is rebuilt, not left to a person", async () => {
     const root = await storeWithRemote("push");
     const second = await secondClone();
@@ -134,6 +136,7 @@ describe("sync after an operation", () => {
     expect(merged).toContain("Attachment upload");
   });
 
+  // @anchor INV:sync/hand-conflict
   test("a conflict in a hand-written file stops before pushing and keeps the local commit", async () => {
     const root = await storeWithRemote("push");
     const second = await secondClone();
@@ -148,6 +151,7 @@ describe("sync after an operation", () => {
     expect((await git(root, ["status", "--porcelain"])).out).toBe("");
   });
 
+  // @anchor INV:sync/red-check
   test("leaves git alone when sync is off or the check is red", async () => {
     const off = join(workspace, "off");
     await cp(join(ROOT, "sandbox"), off, { recursive: true });
@@ -161,6 +165,7 @@ describe("sync after an operation", () => {
     expect((await log(root))[0]).toBe("docs: base");
   });
 
+  // @anchor INV:sync/nested-repository
   test("never commits into a repository the store is only nested in", async () => {
     const outer = join(workspace, "outer");
     await git(workspace, ["init", "--quiet", outer]);
@@ -179,6 +184,7 @@ describe("new documents", () => {
   const shown = async (root: string, ref = "HEAD") =>
     (await git(root, ["show", "--name-only", "--format=", ref])).out.split("\n");
 
+  // @anchor INV:sync/draft-uncommitted
   test("one without a body is a draft: written, left out of the commit until trove sync", async () => {
     const root = await storeWithRemote("push");
     const result = await run(root, (s) => newDocument(s.index, input));

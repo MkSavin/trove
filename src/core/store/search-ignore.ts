@@ -6,7 +6,7 @@ export const SEARCH_IGNORE_FILE = ".ignore";
 
 const archiveLine = (config: Config): string => `${config.archive.folder.replace(/\/+$/, "")}/`;
 
-/** Keeps the archive out of ripgrep-style searches; true when the file changed. */
+// @anchor WORKAROUND:archive-search-ignore A leading dot hides nothing from a search run with --hidden.
 export const ignoreArchive = (root: string, config: Config): Promise<boolean> =>
   ensureLines(join(root, SEARCH_IGNORE_FILE), [archiveLine(config)]);
 

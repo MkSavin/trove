@@ -112,6 +112,7 @@ describe("uncommitted-changes notice", () => {
     expect(await blocks(...READ)).toHaveLength(1);
   });
 
+  // @anchor INV:notice/git-failure
   test("git failing never fails the tool", async () => {
     await makeStore("commit");
     await connect();

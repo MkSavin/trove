@@ -96,6 +96,7 @@ describe("init", () => {
 });
 
 describe("locating a store", () => {
+  // @anchor INV:store/scope-pick
   test("from a project subfolder, by scope when there are several", async () => {
     const app = await project("app");
     const main = await initStore({ cwd: app, language: "en", git: false });
@@ -229,6 +230,7 @@ describe("listing documents", () => {
 });
 
 describe("paths through a symlink", () => {
+  // @anchor INV:store/symlink-paths
   test("the repository root keeps the caller's spelling and paths compare by target", async () => {
     const real = await mkdtemp(join(tmpdir(), "trove-real-"));
     const alias = `${real}-alias`;

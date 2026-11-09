@@ -119,6 +119,7 @@ describe("resync", () => {
     expect((await stat(join(source, ".git", "index"))).mtimeMs).toBe(sourceIndex);
   });
 
+  // @anchor INV:resync/clash-waits
   test("a clash waits for a person, then continues", async () => {
     await edit(target, "RISKS.md", "1 open risk.", "1 open risk, checked in the store.");
     await commitAll(target, "docs: store edit");

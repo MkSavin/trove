@@ -54,6 +54,7 @@ describe("live blocks", () => {
     expect(text.replaceAll("\r\n", "")).not.toContain("\n");
   });
 
+  // @anchor INV:live/bad-blocks
   test("bad blocks are left alone and reported", () => {
     const unknown = block("<!-- trove:nope -->");
     expect(fill(unknown)).toMatchObject({ text: unknown });
@@ -83,6 +84,7 @@ describe("rules on generated blocks and write places", () => {
     expect(writePlace.check(work)).toMatchObject([{ line: 7 }]);
   });
 
+  // @anchor INV:live/archive-snapshot
   test("an archived document is a snapshot", () => {
     const archived = doc(".archive/summaries/SUMMARY_X.md", body);
     expect(liveBlockStale.check(archived, context)).toEqual([]);

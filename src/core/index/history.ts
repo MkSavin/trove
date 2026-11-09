@@ -21,7 +21,7 @@ export type History = { items: ReadonlyMap<Item, Watched>; logs: Logs; reads: Gi
 
 type LogRequest = { root: CodeRoot; paths: Set<string>; since: string };
 
-/** Keeps each git command line well under the Windows limit. */
+// @anchor WORKAROUND:windows-command-line One git call with every path would pass the Windows limit.
 const PATHS_PER_CALL = 100;
 
 export const chunks = <T>(values: readonly T[], size = PATHS_PER_CALL): T[][] =>
@@ -70,6 +70,7 @@ const readCommits = (
   const commits = new Map<string, Commit>();
   for (const batch of chunks(paths)) {
     const log = gitSync(root.dir, [
+      // @anchor WORKAROUND:git-quoted-paths git would print non-ASCII names as quoted octal.
       "-c",
       "core.quotePath=false",
       "--literal-pathspecs",

@@ -7,4 +7,6 @@ pre-commit:
     - name: types
       run: bun check
     - name: test
-      run: bun test
+      run: bun run test
+    - name: docs
+      run: bun run check-docs

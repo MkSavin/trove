@@ -7,7 +7,7 @@ import { applyPatches, type Patch, replace } from "./patch.ts";
 export const resolveFrom = (rel: string, target: string): string =>
   posix.normalize(posix.join(posix.dirname(rel), target));
 
-/** Deep enough for `../` above the store; keeps `posix.relative` off the process's working folder. */
+// @anchor WORKAROUND:posix-relative-cwd Without an absolute base, posix.relative resolves against the working folder.
 const ANCHOR = `/${"_/".repeat(32)}`;
 
 /** Path from one store-relative folder to a store-relative target, which may lie above the store. */

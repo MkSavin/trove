@@ -42,6 +42,7 @@ export const frontMatterYaml = defineRule({
     if (!doc.frontMatter) return [];
     const lines = fieldLines(doc, doc.frontMatter.endLine);
     const valid = parses(lines.map(({ text }) => text).join("\n"));
+    // @anchor WORKAROUND:bun-yaml-error-line No usable line in the error, so each field is parsed alone.
     const broken = lines.filter(
       ({ text }) => CUT_BY_COMMENT.test(text) || (!valid && TOP_LEVEL.test(text) && !parses(text)),
     );

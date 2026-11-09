@@ -33,6 +33,7 @@ afterEach(async () => {
 });
 
 describe("mcp tools", () => {
+  // @anchor INV:mcp/tool-set
   test("a small, stable set of tools", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).toSorted()).toEqual([
@@ -164,6 +165,7 @@ describe("mcp tools", () => {
     expect(audit).toContain("| what is left | checked |");
   });
 
+  // @anchor INV:mcp/refused-edit
   test("refusals explain what is missing instead of writing", async () => {
     const archive = (
       await call("trove_transition", { document: "AUDIT_WEB_1", to: "archive" })
@@ -207,6 +209,7 @@ describe("mcp resources", () => {
 });
 
 describe("trove mcp over stdio", () => {
+  // @anchor INV:mcp/stdio-server
   test("serves the store of its working folder", async () => {
     const transport = new StdioClientTransport({
       command: "bun",

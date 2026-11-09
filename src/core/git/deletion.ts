@@ -37,6 +37,7 @@ const onRemote = async (dir: string, commit: string): Promise<boolean> =>
 const realHost = async (host: string): Promise<string | undefined> => {
   try {
     const child = Bun.spawn(["ssh", "-G", host], {
+      // @anchor WORKAROUND:child-stdin-closed ssh must not read the MCP server's protocol stream.
       stdin: "ignore",
       stdout: "pipe",
       stderr: "ignore",

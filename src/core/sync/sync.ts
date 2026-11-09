@@ -61,7 +61,10 @@ const record = async (
   };
 };
 
-/** One commit per operation, by the store's `sync` mode; `off` leaves git alone, and so does a draft. */
+/**
+ * One commit per operation, by the store's `sync` mode; `off` leaves git alone, and so does a draft.
+ * @anchor DOC:sync
+ */
 export const syncOutcome = (store: Store, outcome: Outcome): Promise<SyncResult> => {
   if (store.config.sync === "off" || !outcome.written)
     return Promise.resolve(idle(store.config.sync));

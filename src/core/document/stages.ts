@@ -61,7 +61,7 @@ const stageTable = (lines: readonly Line[], config: StagesConfig): FoundStages |
 
 /**
  * Stages of whichever comes first: a task list, a table with a status column, or coded headings
- * or bold labels (`Э1`, `Stage 2`); generated blocks, ledgers and fenced code are skipped.
+ * or bold labels (`E1`, `Stage 2`); generated blocks, ledgers and fenced code are skipped.
  */
 export const readStages = (
   body: readonly Line[],

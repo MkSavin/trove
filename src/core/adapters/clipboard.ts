@@ -11,7 +11,7 @@ const run = async (command: string[], stdin?: string): Promise<void> => {
   if ((await child.exited) !== 0) throw new TroveError(`${command[0]} failed to set the clipboard`);
 };
 
-/** clip.exe reads the console code page and mangles Cyrillic, so Windows goes through a UTF-8 file. */
+// @anchor WORKAROUND:clip-exe-codepage clip.exe reads the console code page and mangles Cyrillic.
 const copyOnWindows = async (text: string): Promise<void> => {
   const file = join(tmpdir(), `trove-clipboard-${process.pid}.txt`);
   await Bun.write(file, text);

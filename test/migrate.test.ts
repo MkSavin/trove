@@ -76,6 +76,7 @@ describe("migrate", () => {
     expect(existsSync(join(target, ".git", "hooks", "pre-commit"))).toBe(true);
   });
 
+  // @anchor INV:migrate/reads-only
   test("only reads the archive", async () => {
     const index = join(archive, ".git", "index");
     const before = {

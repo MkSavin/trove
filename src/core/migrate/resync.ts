@@ -27,6 +27,7 @@ export type Resynced = {
 };
 
 const CONFLICT = /^<{7} /m;
+// @anchor WORKAROUND:git-quoted-paths git would print non-ASCII names as quoted octal.
 const QUIET = ["-c", "core.quotePath=false"];
 
 /** Where the store keeps a source path now: in place, or moved into the archive mirror. */

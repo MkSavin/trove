@@ -102,6 +102,7 @@ describe("trove serve", () => {
     expect((await get("/doc/research/RESEARCH_HOSTILE.md")).text).toContain("changed");
   });
 
+  // @anchor INV:serve/foreign-hosts
   test("answers bad filters, unknown pages, writes and foreign hosts with errors", async () => {
     expect((await get("/?q=nofilter")).status).toBe(400);
     expect((await get("/summaries?kind=nope")).status).toBe(400);

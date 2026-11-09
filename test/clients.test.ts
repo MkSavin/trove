@@ -117,6 +117,7 @@ describe("client add --local", () => {
     expect(await Bun.file(paths.config).text()).toBe("{ not json");
   });
 
+  // @anchor INV:clients/forward-keys
   test("claude follows CLAUDE_CONFIG_DIR, else the home folder; keys use forward slashes", () => {
     expect(claudeUserPaths({}, join("home", "me"))).toEqual({
       config: join("home", "me", ".claude.json"),

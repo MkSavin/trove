@@ -47,6 +47,7 @@ export type Document = {
 
 export type Source = { path: string; rel: string; text: string };
 
+/** @anchor DOC:documents */
 export const parseDocument = ({ path, rel, text }: Source, config: Config): Document => {
   const lines = splitLines(text);
   const fenced = fencedLines(lines);

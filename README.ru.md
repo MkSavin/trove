@@ -318,7 +318,7 @@ const urgent = selectItems(store.index, { priority: ["P0"], status: ["open"] });
 
 ```sh
 bun install          # заодно ставит хук lefthook перед коммитом
-bun run verify       # biome + bun check (TypeScript 7) + bun test
+bun run verify       # biome + bun check (TypeScript 7) + bun test + документация (AGENTS.md, .agents/)
 bun run trove check --store sandbox
 ```
 

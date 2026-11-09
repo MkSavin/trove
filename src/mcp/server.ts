@@ -14,6 +14,7 @@ Read with trove_query and trove_show instead of opening whole files; edit only t
 Start with trove_regulation topic=workflow. Pass store only when the project has several stores.
 After editing a document by hand, run trove_check. Before ending your turn, run trove_sync so nothing stays uncommitted.`;
 
+/** @anchor DOC:mcp */
 export const createServer = (context: Context): McpServer => {
   const server = new McpServer(
     { name: "trove", version: packageJson.version },

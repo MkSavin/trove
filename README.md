@@ -317,7 +317,7 @@ const urgent = selectItems(store.index, { priority: ["P0"], status: ["open"] });
 
 ```sh
 bun install          # also installs the lefthook pre-commit hook
-bun run verify       # biome + bun check (TypeScript 7) + bun test
+bun run verify       # biome + bun check (TypeScript 7) + bun test + docs (AGENTS.md, .agents/)
 bun run trove check --store sandbox
 ```
 

@@ -20,7 +20,7 @@ export const stripMarkup = (text: string): string =>
     .replace(SPACES, " ")
     .trim();
 
-/** Up to the first sentence end that does not just close a stage number such as `1.` or `Э2.` */
+/** Up to the first sentence end that does not just close a stage number such as `1.` or `E2.` */
 const firstSentence = (text: string): string => {
   for (const { index, 0: mark } of text.matchAll(SENTENCE_END)) {
     if (!isBareNumber(text.slice(0, index + 1))) {

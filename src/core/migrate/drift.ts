@@ -10,6 +10,7 @@ export type SourceHealth = {
   changed: boolean | undefined;
 };
 
+// @anchor WORKAROUND:git-quoted-paths git would print non-ASCII names as quoted octal.
 const QUIET = ["-c", "core.quotePath=false"];
 
 const lines = (text: string): string[] => text.split("\n").filter(Boolean);

@@ -44,6 +44,7 @@ const readHunks = (
   const hunks: SavedHunks = [];
   for (const batch of chunks(paths)) {
     const diff = gitSync(root.dir, [
+      // @anchor WORKAROUND:git-quoted-paths git would print non-ASCII names as quoted octal.
       "-c",
       "core.quotePath=false",
       "--literal-pathspecs",

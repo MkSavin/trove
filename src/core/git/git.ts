@@ -10,9 +10,9 @@ export type GitOptions = {
   env?: Readonly<Record<string, string>>;
 };
 
+// @anchor WORKAROUND:git-hook-variables A hook's variables would steer every repository to the hook's.
 const HOOK_VARIABLES = new Set(["GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE", "GIT_PREFIX"]);
 
-/** The environment without the variables a git hook sets, which would steer every repository to the hook's. */
 export const gitEnv = (): Record<string, string> =>
   Object.fromEntries(
     Object.entries(process.env).filter(
@@ -25,10 +25,10 @@ export const git = async (
   args: readonly string[],
   { raw = false, env }: GitOptions = {},
 ): Promise<GitResult> => {
-  // stdin stays closed: an MCP server over stdio reads its protocol from there.
   const child = Bun.spawn(["git", ...args], {
     cwd,
     env: { ...gitEnv(), ...env },
+    // @anchor WORKAROUND:child-stdin-closed An MCP server over stdio reads its protocol from stdin.
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
@@ -43,6 +43,7 @@ export const git = async (
 
 /** For reads during a synchronous query; callers cache the result per index. */
 export const gitSync = (cwd: string, args: readonly string[]): GitResult => {
+  // @anchor WORKAROUND:child-stdin-closed An MCP server over stdio reads its protocol from stdin.
   const child = Bun.spawnSync(["git", ...args], { cwd, env: gitEnv(), stdin: "ignore" });
   return {
     ok: child.exitCode === 0,
@@ -61,9 +62,9 @@ export const gitOrThrow = async (
   return result.out;
 };
 
-/** Root of the repository containing `cwd`, spelled like `cwd` even when git resolves symlinks. */
 export const toplevel = async (cwd: string): Promise<string | undefined> => {
   const result = await git(cwd, ["rev-parse", "--show-toplevel"]);
   if (!result.ok) return undefined;
+  // @anchor WORKAROUND:path-spelling git answers with symlinks resolved; callers compare against their spelling.
   return resolve(cwd, relative(realPath(cwd), realPath(result.out)));
 };

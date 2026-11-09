@@ -48,6 +48,7 @@ afterEach(async () => {
 });
 
 describe("the store's .ignore", () => {
+  // @anchor INV:search-ignore/init-writes
   test("init writes and commits it; it is no document and trips no rule", async () => {
     const { store } = await newStore();
     expect(await ignoreOf(store)).toBe(".archive/\n");

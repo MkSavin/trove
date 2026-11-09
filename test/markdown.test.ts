@@ -11,6 +11,7 @@ import { lineDiff } from "../src/core/text/diff.ts";
 import { splitLines } from "../src/core/text/lines.ts";
 
 describe("splitLines", () => {
+  // @anchor INV:markdown/crlf-offsets
   test("keeps offsets into the original CRLF text", () => {
     const text = "a\r\nbc\nd";
     const lines = splitLines(text);

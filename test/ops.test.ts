@@ -175,6 +175,7 @@ describe("item close", () => {
     expect(closed).toContain("### DEBT-S2. Search index in its own service (done)");
   });
 
+  // @anchor INV:ops/keeps-crlf
   test("keeps CRLF line breaks", async () => {
     const store = await sandbox();
     const rel = "audits/AUDIT_API_2.md";
@@ -239,6 +240,7 @@ describe("item defer and add", () => {
     ]);
   });
 
+  // @anchor INV:ops/closed-number
   test("add never reuses the number of a closed item", async () => {
     const store = await sandbox();
     await apply(store, closeItem(store.index, "WEB1-8"));
@@ -514,6 +516,7 @@ describe("sections, headers and lookups", () => {
     expect(found[0]?.message).toMatch(/takes \d+ bytes, over 300/);
   });
 
+  // @anchor INV:ops/summary-snapshot
   test("a summary keeps its blocks as a snapshot once its date has passed", async () => {
     const later = await openStore({ cwd: ROOT, store: join(ROOT, "sandbox"), today: "2099-01-01" });
     const summary = requireDocument(later.index, "SUMMARY_WEB");

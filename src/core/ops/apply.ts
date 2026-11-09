@@ -54,7 +54,10 @@ const write = async (root: string, changes: readonly Change[]): Promise<void> =>
   }
 };
 
-/** Checks the result in memory first: a change that adds errors never reaches the disk. */
+/**
+ * Checks the result in memory first: a change that adds errors never reaches the disk.
+ * @anchor DOC:operations
+ */
 export const applyPlan = async (
   store: Store,
   plan: Plan,

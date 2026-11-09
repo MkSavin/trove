@@ -64,6 +64,7 @@ export const openConfig = async (options: OpenOptions): Promise<StoreConfig> => 
   return { root, configPath, config: await readConfig(configPath, options.cache) };
 };
 
+/** @anchor DOC:store */
 export const openStore = async (options: OpenOptions): Promise<Store> => {
   const { cache } = options;
   const { root, configPath, config } = await openConfig(options);

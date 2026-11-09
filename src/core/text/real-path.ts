@@ -12,6 +12,7 @@ export const realPath = (path: string): string => {
 
 export const samePath = (a: string, b: string): boolean => {
   const [x, y] = [realPath(a), realPath(b)];
+  // @anchor WORKAROUND:path-spelling Windows spells one folder in either case.
   return process.platform === "win32" ? x.toLowerCase() === y.toLowerCase() : x === y;
 };
 

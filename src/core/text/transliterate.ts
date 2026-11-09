@@ -41,6 +41,6 @@ const CYRILLIC: Readonly<Record<string, string>> = {
 
 const LETTER = /[Ѐ-ӿ]/gu;
 
-/** Russian, Ukrainian and Belarusian letters in Latin capitals: `Чего` → `CHEGO`. */
+/** Russian, Ukrainian and Belarusian letters in Latin capitals, by sound. */
 export const transliterate = (text: string): string =>
   text.toUpperCase().replace(LETTER, (letter) => CYRILLIC[letter] ?? letter);

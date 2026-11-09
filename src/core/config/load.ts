@@ -9,8 +9,8 @@ const readYaml = (source: string, origin: string): unknown => {
   try {
     return Bun.YAML.parse(source);
   } catch (error) {
-    const { message, line } = error as Error & { line?: number };
-    throw new TroveError(`${origin}${line === undefined ? "" : `:${line}`}: ${message}`);
+    // @anchor WORKAROUND:bun-yaml-error-line The error's line is the JS caller's, not the YAML's.
+    throw new TroveError(`${origin}: ${(error as Error).message}`);
   }
 };
 

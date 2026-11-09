@@ -366,6 +366,7 @@ const driftOf = (store: Store, ids: readonly string[]) =>
   queryRows(store.index, "items", { id: [...ids] }, ["id", "drift"]).rows;
 
 describe("drift", () => {
+  // @anchor INV:extras/line-drift
   test("an item drifts when lines its section links to changed after the check", async () => {
     const store = await sandbox();
     const view = await driftedRepo(store);
