@@ -9,6 +9,7 @@ import { findUp } from "./locate.ts";
 import { openStore } from "./open.ts";
 import { entryRoot, POINTER_FILE, type PointerPlace, readPointer } from "./pointer.ts";
 import { findProject, readRegistry } from "./registry.ts";
+import { archiveIgnored } from "./search-ignore.ts";
 import { siblingStores } from "./siblings.ts";
 
 export type StoreHealth = {
@@ -21,17 +22,23 @@ export type StoreHealth = {
   errors: number | undefined;
   problem: string | undefined;
   source: SourceHealth | undefined;
+  /** Whether `.ignore` keeps the archive out of ripgrep-style searches. */
+  archiveIgnored: boolean | undefined;
 };
 
-export type Health = {
+type StoreEntry = { name: string; root: string };
+
+type FoundStores = {
   project: string;
   /** Where the project names its stores: `.trove.yaml`, `.git/trove.yaml`, or nowhere. */
   pointer: PointerPlace | undefined;
   registered: boolean;
-  stores: readonly StoreHealth[];
+  entries: readonly StoreEntry[];
 };
 
-const inspect = async (name: string, root: string): Promise<StoreHealth> => {
+export type Health = Omit<FoundStores, "entries"> & { stores: readonly StoreHealth[] };
+
+const inspect = async ({ name, root }: StoreEntry): Promise<StoreHealth> => {
   const blank = {
     name,
     root,
@@ -40,6 +47,7 @@ const inspect = async (name: string, root: string): Promise<StoreHealth> => {
     documents: undefined,
     errors: undefined,
     source: undefined,
+    archiveIgnored: undefined,
   };
   if (!existsSync(join(root, CONFIG_FILE)))
     return { ...blank, present: false, problem: "not on this machine: run trove clone" };
@@ -55,6 +63,7 @@ const inspect = async (name: string, root: string): Promise<StoreHealth> => {
       errors: runRules(store.rules, store.index).filter((d) => d.severity === "error").length,
       problem: undefined,
       source: await sourceHealth(root),
+      archiveIgnored: await archiveIgnored(root, store.config),
     };
   } catch (error) {
     return { ...blank, present: true, problem: (error as Error).message };
@@ -62,37 +71,41 @@ const inspect = async (name: string, root: string): Promise<StoreHealth> => {
 };
 
 /** Inside a store with no pointer above: the project the registry ties it to, else the store alone. */
-const fromStore = async (store: string): Promise<Health> => {
+const fromStore = async (store: string): Promise<FoundStores> => {
   const project = (await readRegistry()).projects.find((entry) =>
     entry.stores.some((candidate) => samePath(candidate.path, store)),
   );
-  const entries = project?.stores.map((entry) => ({ name: entry.name, root: entry.path })) ?? [
-    { name: basename(store), root: store },
-  ];
   return {
     project: project?.root ?? store,
     pointer: undefined,
     registered: project !== undefined,
-    stores: await Promise.all(entries.map((entry) => inspect(entry.name, entry.root))),
+    entries: project?.stores.map((entry) => ({ name: entry.name, root: entry.path })) ?? [
+      { name: basename(store), root: store },
+    ],
   };
 };
 
-/** Everything `trove doctor` prints, gathered without changing anything. */
-export const diagnose = async (cwd: string): Promise<Health> => {
+/** Every store this folder can reach, without opening any of them. */
+export const findStores = async (cwd: string): Promise<FoundStores> => {
   const store = findUp(cwd, CONFIG_FILE);
   const pointed = findUp(cwd, POINTER_FILE);
   if (store && (!pointed || isInside(store, pointed))) return fromStore(store);
   const project = pointed ?? (await toplevel(cwd)) ?? cwd;
   const pointer = await readPointer(project);
   const registered = await findProject(project);
-  const entries = pointer
-    ? pointer.stores.map((entry) => ({ name: entry.name, root: entryRoot(project, entry) }))
-    : (registered?.stores.map((store) => ({ name: store.name, root: store.path })) ??
-      (await siblingStores(project)));
   return {
     project,
     pointer: pointer?.place,
     registered: registered !== undefined,
-    stores: await Promise.all(entries.map((entry) => inspect(entry.name, entry.root))),
+    entries: pointer
+      ? pointer.stores.map((entry) => ({ name: entry.name, root: entryRoot(project, entry) }))
+      : (registered?.stores.map((store) => ({ name: store.name, root: store.path })) ??
+        (await siblingStores(project))),
   };
+};
+
+/** Everything `trove doctor` prints, gathered without changing anything. */
+export const diagnose = async (cwd: string): Promise<Health> => {
+  const { entries, ...found } = await findStores(cwd);
+  return { ...found, stores: await Promise.all(entries.map(inspect)) };
 };

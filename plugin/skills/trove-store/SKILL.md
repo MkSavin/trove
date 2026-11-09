@@ -49,4 +49,4 @@ Keep ledger cells free of `|` and ids in ASCII. Do not edit generated files such
 
 ## After hand edits
 
-Run `trove_check`; when it is clean, `trove_sync` commits the edits with rebuilt reports (the store's `sync` mode decides whether it also pushes). Never commit or push the store with git yourself.
+Run `trove_check` right after editing a document by hand. Before ending your turn, run `trove_sync`: it commits the edits with rebuilt reports (the store's `sync` mode decides whether it also pushes) and refuses while check is red. A tool result that ends with a notice about uncommitted files means this step is still open. Never commit or push the store with git yourself.

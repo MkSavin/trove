@@ -1,4 +1,4 @@
-export const CLIENTS = ["claude", "cursor", "codex"] as const;
+export const CLIENTS = ["claude", "cursor", "codex", "kimi"] as const;
 export type ClientName = (typeof CLIENTS)[number];
 
 export type ClientLayout = {
@@ -13,6 +13,7 @@ export const LAYOUTS: Readonly<Record<ClientName, ClientLayout>> = {
   claude: { mcpFile: ".mcp.json", mcpFormat: "json", skillsDir: ".claude/skills" },
   cursor: { mcpFile: ".cursor/mcp.json", mcpFormat: "json", skillsDir: ".cursor/skills" },
   codex: { mcpFile: ".codex/config.toml", mcpFormat: "toml", skillsDir: ".agents/skills" },
+  kimi: { mcpFile: ".kimi-code/mcp.json", mcpFormat: "json", skillsDir: ".kimi-code/skills" },
 };
 
 export const isClient = (value: string): value is ClientName =>

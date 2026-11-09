@@ -2,7 +2,12 @@ import { z } from "zod";
 import type { StoreCache } from "../core/store/cache.ts";
 import { openStore, type Store } from "../core/store/open.ts";
 
-export type Context = { cwd: string; cache?: StoreCache };
+export type Context = {
+  cwd: string;
+  cache?: StoreCache;
+  /** How long a store's git status is reused between read-only tools; 0 asks git every time. */
+  statusTtlMs?: number;
+};
 
 export const storeField = z
   .string()

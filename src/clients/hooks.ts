@@ -1,16 +1,16 @@
-import { dirname } from "node:path";
-import { CONFIG_FILE } from "../../core/config/load.ts";
-import { git } from "../../core/git/git.ts";
-import { runRules } from "../../core/rules/run.ts";
-import { findUp, locateStore } from "../../core/store/locate.ts";
-import { openStore } from "../../core/store/open.ts";
-import { relativePath } from "../../core/store/paths.ts";
-import { syncStore } from "../../core/sync/sync.ts";
+import { dirname, resolve } from "node:path";
+import { CONFIG_FILE } from "../core/config/load.ts";
+import { git } from "../core/git/git.ts";
+import { runRules } from "../core/rules/run.ts";
+import { findUp, locateStore } from "../core/store/locate.ts";
+import { openStore } from "../core/store/open.ts";
+import { relativePath } from "../core/store/paths.ts";
+import { syncStore } from "../core/sync/sync.ts";
 
-/** The part of Claude Code's hook input trove reads. */
+/** The part of an assistant's hook input trove reads: Claude Code sends `file_path`, Kimi Code `path`. */
 export type HookInput = {
   cwd?: string;
-  tool_input?: { file_path?: string };
+  tool_input?: { file_path?: string; path?: string };
   stop_hook_active?: boolean;
 };
 
@@ -21,8 +21,9 @@ const QUIET: HookReply = { code: 0, message: "" };
 
 /** After an edit to a Markdown file of a store: its errors go back to the model. */
 export const afterEdit = async (input: HookInput): Promise<HookReply> => {
-  const path = input.tool_input?.file_path;
-  if (!path?.endsWith(".md")) return QUIET;
+  const edited = input.tool_input?.file_path ?? input.tool_input?.path;
+  if (!edited?.endsWith(".md")) return QUIET;
+  const path = resolve(input.cwd ?? process.cwd(), edited);
   const root = findUp(dirname(path), CONFIG_FILE);
   if (!root) return QUIET;
 

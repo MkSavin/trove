@@ -1,4 +1,5 @@
 import { basename, join } from "node:path";
+import { CLIENTS } from "../../clients/clients.ts";
 import { TroveError } from "../../core/errors.ts";
 import { toplevel } from "../../core/git/git.ts";
 import {
@@ -77,8 +78,7 @@ export const printInit = (result: InitResult, io: Io): void => {
 export const init: Command = {
   name: "init",
   summary: "Create a store for the current project, link and register it",
-  usage:
-    "trove init [--path DIR] [--remote URL] [--lang en|ru] [--share] [--client claude|cursor|codex]... [--no-git] [--yes]",
+  usage: `trove init [--path DIR] [--remote URL] [--lang en|ru] [--share] [--client ${CLIENTS.join("|")}]... [--no-git] [--yes]`,
   run: async (argv, io) => {
     const { values } = parse(argv, INIT_OPTIONS);
     const answers = await askMissing(values, io);

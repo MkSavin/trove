@@ -11,10 +11,9 @@ import type { Rule } from "../rules/rule.ts";
 import { reusable, type StoreCache } from "./cache.ts";
 import { locateStore } from "./locate.ts";
 
-export type Store = {
-  root: string;
-  configPath: string;
-  config: Config;
+export type StoreConfig = { root: string; configPath: string; config: Config };
+
+export type Store = StoreConfig & {
   rules: readonly Rule[];
   index: StoreIndex;
 };
@@ -57,13 +56,17 @@ const readConfig = async (path: string, cache: StoreCache | undefined): Promise<
   return config;
 };
 
-export const openStore = async (options: OpenOptions): Promise<Store> => {
-  const { cache } = options;
+export const openConfig = async (options: OpenOptions): Promise<StoreConfig> => {
   const root = await resolveRoot(options);
   const configPath = options.config
     ? resolve(options.cwd, options.config)
     : join(root, CONFIG_FILE);
-  const config = await readConfig(configPath, cache);
+  return { root, configPath, config: await readConfig(configPath, options.cache) };
+};
+
+export const openStore = async (options: OpenOptions): Promise<Store> => {
+  const { cache } = options;
+  const { root, configPath, config } = await openConfig(options);
   const rules = mergeRules(builtinRules, await loadPluginRules(root, config.plugins));
   const built = await buildIndex(root, config, options.today, reusable(cache, root, config));
   cache?.documents.set(root, { config, byRel: built.byRel });

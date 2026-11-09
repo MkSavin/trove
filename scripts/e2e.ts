@@ -11,6 +11,7 @@ const env = {
   ...process.env,
   TROVE_HOME: join(workspace, "home"),
   CLAUDE_CONFIG_DIR: join(workspace, "claude"),
+  KIMI_CODE_HOME: join(workspace, "kimi"),
   GIT_AUTHOR_NAME: "trove e2e",
   GIT_AUTHOR_EMAIL: "e2e@example.com",
   GIT_COMMITTER_NAME: "trove e2e",
@@ -104,6 +105,17 @@ try {
     throw new Error("claude was not connected for this machine only");
   }
   await trove(["client", "add", "cursor", "--local"], 2);
+  await trove(["client", "add", "kimi"]);
+  if (!(await Bun.file(join(app, ".kimi-code", "mcp.json")).text()).includes('"trove"')) {
+    throw new Error("kimi was not connected to the project");
+  }
+  const kimiOutput = await trove(["client", "add", "kimi", "--local", "--hooks"]);
+  const kimiConfig = Bun.TOML.parse(
+    await Bun.file(join(workspace, "kimi", "config.toml")).text(),
+  ) as { hooks?: unknown[] };
+  if (!kimiOutput.includes("every project") || kimiConfig.hooks?.length !== 2) {
+    throw new Error("kimi user-level setup is wrong");
+  }
   await trove(["doctor"]);
   const pushed = await Bun.$`git log --format=%s main`.cwd(remote).env(env).quiet().text();
   if (!pushed.includes("docs: close WEBCLIENT1-2, archive AUDIT_WEB_CLIENT_1")) {

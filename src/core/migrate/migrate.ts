@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { appendFile, readdir, rm } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
 import { CONFIG_FILE, parseConfig } from "../config/load.ts";
 import { TroveError } from "../errors.ts";
@@ -9,11 +9,13 @@ import type { Language } from "../presets/presets.ts";
 import { writeReports } from "../reports/write.ts";
 import type { Diagnostic } from "../rules/diagnostic.ts";
 import { runRules } from "../rules/run.ts";
+import { ensureLines } from "../store/ensure-lines.ts";
 import { prepareRepository } from "../store/hook.ts";
 import { openStore } from "../store/open.ts";
 import { toPosix } from "../store/paths.ts";
 import { readPointer, writePointer } from "../store/pointer.ts";
 import { registerProject } from "../store/registry.ts";
+import { ignoreArchive } from "../store/search-ignore.ts";
 import { copySource } from "./copy.ts";
 import { inferConfig } from "./infer.ts";
 import { type Inventory, inventoryChanges, takeInventory } from "./inventory.ts";
@@ -60,15 +62,6 @@ const commit = async (root: string, message: string): Promise<string | undefined
   const done = await git(root, ["commit", "--quiet", "-m", message]);
   if (!done.ok) throw new TroveError(`commit in ${root} failed: ${done.err}`);
   return message.split("\n")[0];
-};
-
-const ensureLines = async (file: string, lines: readonly string[]): Promise<void> => {
-  const handle = Bun.file(file);
-  const text = (await handle.exists()) ? await handle.text() : "";
-  const missing = lines.filter((line) => !text.split(/\r?\n/).includes(line));
-  if (missing.length === 0) return;
-  const gap = text === "" || text.endsWith("\n") ? "" : "\n";
-  await appendFile(file, `${gap}${missing.join("\n")}\n`);
 };
 
 const linkProject = async (options: MigrateOptions, target: string): Promise<void> => {
@@ -126,6 +119,7 @@ export const migrateArchive = async (options: MigrateOptions): Promise<MigrateRe
     join(target, ".gitattributes"),
     Object.values(config.reports).map((report) => `${report.output} merge=ours`),
   );
+  await ignoreArchive(target, config);
 
   await writeReports(
     (await openStore({ cwd: target, store: target })).index,

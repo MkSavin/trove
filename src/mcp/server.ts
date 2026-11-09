@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import packageJson from "../../package.json" with { type: "json" };
 import { createStoreCache } from "../core/store/cache.ts";
 import type { Context } from "./context.ts";
+import { addStoreNotices } from "./notice.ts";
 import { registerResources } from "./resources.ts";
 import { registerEditTools } from "./tools/edit.ts";
 import { registerMaintenanceTools } from "./tools/maintain.ts";
@@ -10,7 +11,8 @@ import { registerReadTools } from "./tools/read.ts";
 
 const INSTRUCTIONS = `trove keeps a project's audits, plans, specs and research as Markdown in a git store.
 Read with trove_query and trove_show instead of opening whole files; edit only through trove_create, trove_update, trove_transition and trove_item, which patch their own lines, refuse changes that add errors and rebuild reports.
-Start with trove_regulation topic=workflow. Pass store only when the project has several stores.`;
+Start with trove_regulation topic=workflow. Pass store only when the project has several stores.
+After editing a document by hand, run trove_check. Before ending your turn, run trove_sync so nothing stays uncommitted.`;
 
 export const createServer = (context: Context): McpServer => {
   const server = new McpServer(
@@ -18,6 +20,7 @@ export const createServer = (context: Context): McpServer => {
     { instructions: INSTRUCTIONS },
   );
   const shared: Context = { cache: createStoreCache(), ...context };
+  addStoreNotices(server, shared);
   registerReadTools(server, shared);
   registerEditTools(server, shared);
   registerMaintenanceTools(server, shared);

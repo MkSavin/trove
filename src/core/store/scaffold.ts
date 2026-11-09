@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { CONFIG_FILE, parseConfig } from "../config/load.ts";
 import type { Config } from "../config/schema.ts";
 import { TroveError } from "../errors.ts";
+import { ignoreArchive } from "./search-ignore.ts";
 
 export type Scaffold = {
   project: string;
@@ -60,5 +61,6 @@ export const writeScaffold = async (root: string, scaffold: Scaffold): Promise<C
   await Bun.write(join(root, "AGENTS.md"), agentsNotes(scaffold));
   await Bun.write(join(root, ".gitignore"), ".trove/cache/\n");
   await Bun.write(join(root, ".gitattributes"), gitAttributes(config));
+  await ignoreArchive(root, config);
   return config;
 };

@@ -1,5 +1,6 @@
 import type { SourceHealth } from "../../core/migrate/drift.ts";
 import { diagnose, type StoreHealth } from "../../core/store/doctor.ts";
+import { SEARCH_IGNORE_FILE } from "../../core/store/search-ignore.ts";
 import { parse } from "../args.ts";
 import { type Command, EXIT } from "../command.ts";
 import { type Paint, painter } from "../format/style.ts";
@@ -41,6 +42,13 @@ const sourceWarnings = (stores: readonly StoreHealth[]): string[] =>
       : [],
   );
 
+const ignoreHints = (stores: readonly StoreHealth[]): string[] =>
+  stores.flatMap(({ name, root, archiveIgnored }) =>
+    archiveIgnored === false
+      ? [`! ${name}: no ${SEARCH_IGNORE_FILE} line for the archive in ${root}, so searches read it`]
+      : [],
+  );
+
 export const doctor: Command = {
   name: "doctor",
   summary: "Show the project, its stores and their health",
@@ -60,7 +68,8 @@ export const doctor: Command = {
       ...health.stores.flatMap((store) => storeRows(store, paint)),
     ];
     for (const line of formatTable(rows)) io.print(line);
-    for (const warning of sourceWarnings(health.stores)) io.print(paint("yellow", warning));
+    for (const warning of [...sourceWarnings(health.stores), ...ignoreHints(health.stores)])
+      io.print(paint("yellow", warning));
     if (health.stores.length === 0)
       io.print(paint("yellow", "no stores: run trove init or trove clone"));
     const healthy = health.stores.every(

@@ -1,4 +1,5 @@
-import { rename } from "node:fs/promises";
+import { mkdir, rename, stat, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { TroveError } from "../core/errors.ts";
 import { SERVER, SERVER_NAME } from "./clients.ts";
 
@@ -41,8 +42,14 @@ export const mergeToml = (existing: string | undefined): string | undefined => {
 };
 
 /** Another program may read the file at any moment: it sees the old text or the new, never half. */
-export const replaceFile = async (path: string, text: string): Promise<void> => {
+export const replaceFile = async (path: string, data: string | Uint8Array): Promise<void> => {
   const temp = `${path}.trove-${process.pid}.tmp`;
-  await Bun.write(temp, text);
+  const mode = await stat(path).then(
+    (existing) => existing.mode & 0o777,
+    () => undefined,
+  );
+  await mkdir(dirname(path), { recursive: true });
+  // A config can hold credentials: the new file must not be more readable than the old one.
+  await writeFile(temp, data, mode === undefined ? {} : { mode });
   await rename(temp, path);
 };

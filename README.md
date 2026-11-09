@@ -59,7 +59,7 @@ A teammate runs `trove clone <store-url>` in their clone of the project: the sto
 | `trove migrate <archive> <store> [--drop FILE] [--project DIR [--link]]` | Build a store from an existing archive: clone with history, uncommitted work as its own commit, a config fitted to the documents (language, extra types, statuses and whether they are written as keys, fields, ledger columns per type, status lines only where documents have them, what the archive keeps, the old backlog's group order), rebuilt reports, a count of documents and items before and after. The archive is only read, and its remote is not carried over. `--project` links the store to that project privately, `--link` through a committed `.trove.yaml`. |
 | `trove store add <name> --scope <glob>` | Another store for a team with its own access; commands run under `--scope` folders go to it. |
 | `trove remote add <url>` | Connect a local store to a remote repository, switch `sync` to `push` and push the history. |
-| `trove client add <claude\|cursor\|codex> [--local]` | Register the MCP server and the skills for an assistant in this project; `--local` keeps them on this machine and out of the project (Claude Code). |
+| `trove client add <claude\|cursor\|codex\|kimi> [--local] [--hooks]` | Register the MCP server and the skills for an assistant in this project; `--local` keeps them on this machine and out of the project (Claude Code; Kimi Code, for every project); `--hooks` adds Kimi Code hooks to its user-level config. |
 | `trove doctor` · `trove forget` | Show the project, its stores and their health; inside a store, that store and the project the registry ties it to · drop the project from this machine's registry. |
 
 **Read**
@@ -130,10 +130,13 @@ Commands find their store from the current folder: inside a store, then through 
 | Claude Code | `/plugin marketplace add MkSavin/trove`, then `/plugin install trove@trove-marketplace`: the MCP server, both skills, and hooks that run `check` on every edited document of a store and `sync` when a session ends. |
 | Cursor | `trove client add cursor`: `.cursor/mcp.json` and `.cursor/skills/`. |
 | Codex | `trove client add codex`: `[mcp_servers.trove]` in `.codex/config.toml` and `.agents/skills/`. |
+| Kimi Code | `trove client add kimi`: `.kimi-code/mcp.json` and `.kimi-code/skills/`. `--local` writes nothing into the project: `mcp.json` and `skills/` go to `~/.kimi-code/` (`$KIMI_CODE_HOME` when set), which Kimi Code reads for every project on this machine. `--hooks` appends two `[[hooks]]` entries to the `config.toml` there, `check` after an edit and `sync` when a session ends: this edits your user-level config, for every project, and Kimi Code hooks are beta. |
 | any | `trove client add claude` writes `.mcp.json` and `.claude/skills/` without the plugin; `trove init --client <name>` does it at creation. |
 | this machine only | `trove client add claude --local` writes nothing into the project: the MCP server goes to this project's entry in `~/.claude.json` (what `claude mcp add --scope local` does) and the skills to `~/.claude/skills/`, both under `$CLAUDE_CONFIG_DIR` when it is set. Cursor and Codex keep MCP servers only in the project or for every project, so they refuse `--local`. |
 
 The skills, `trove-store` and `trove-migrate`, live once in [`plugin/skills`](plugin/skills) and are bundled into the binary, so every client gets the same text.
+
+Discipline does not depend on hooks. While a store with `sync` on has uncommitted changes, every MCP tool result ends with a short notice giving their number and first few paths and asking for `trove_check`, then `trove_sync`. The store's pre-commit `trove check` works the same for every client.
 
 ## Concepts
 
@@ -141,7 +144,7 @@ The skills, `trove-store` and `trove-migrate`, live once in [`plugin/skills`](pl
 
 By default trove leaves no trace in the project tree: the link lives in `.git/trove.yaml`, which git never shows or commits, and in `~/.trove/registry.yaml`; even without both, a store next to the project whose `roots` name it is found. Each teammate links their own clone with `trove clone <store-url>`. A team that wants the link in the repository uses `--share`, which writes `.trove.yaml` for a plain `trove clone`. Assistants follow the same rule: `trove client add claude --local` keeps their setup on this machine, and `trove init --client` does that unless the store is shared.
 
-**Archive.** Working folders sit next to an archive folder (`.archive/` by default) that mirrors them.
+**Archive.** Working folders sit next to an archive folder (`.archive/` by default) that mirrors them. A `.ignore` file at the store root lists it, so ripgrep-based search tools skip it even when they search hidden files: `trove init` and `trove migrate` write it, `trove client add kimi` adds it to an older store, and `trove doctor` says when it is missing. An agent can still search the archive on purpose, through `include_ignored` in Kimi Code's Grep or by naming a path inside it.
 
 **Document type.** A type is a set of capabilities, not hard-coded behaviour:
 
@@ -335,7 +338,7 @@ Both workflows also start by hand: **Actions → ci → Run workflow** on any br
 - [x] **Stores and edits.** `init`, `clone`, `migrate`, `store add`, per-machine registry, a private or shared pointer; `doc` and `item` edits that patch only their own lines.
 - [x] **Sync.** Commit per operation, push with rebase and rebuilt reports, `trove sync` for hand edits, `trove remote add`.
 - [x] **MCP.** One stdio server over the same operations, regulation generated from the config, several stores per project.
-- [x] **Clients.** Agent skills, a Claude Code plugin with hooks, `client add` for Cursor and Codex, single-file binaries on every release.
+- [x] **Clients.** Agent skills, a Claude Code plugin with hooks, `client add` for Cursor, Codex and Kimi Code, single-file binaries on every release.
 - [x] **Migration.** Archives with their own statuses, ledger columns and conventions are fitted by `migrate`, and kept in step with `resync` while the move is under way.
 
 ## License
