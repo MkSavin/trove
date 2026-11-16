@@ -15,11 +15,12 @@ const readInput = async (): Promise<HookInput> => {
 };
 
 /** A crash must not exit 2 like other CLI errors: at Stop that would keep the assistant running forever. */
-const replyOf = async (handler: Handler): Promise<HookReply> => {
+const replyOf = async (handler: Handler): Promise<readonly [HookInput, HookReply]> => {
   try {
-    return await handler(await readInput());
+    const input = await readInput();
+    return [input, await handler(input)];
   } catch (error) {
-    return { code: EXIT.failed, message: `trove hook failed: ${(error as Error).message}` };
+    return [{}, { code: EXIT.failed, message: `trove hook failed: ${(error as Error).message}` }];
   }
 };
 
@@ -31,8 +32,13 @@ export const hook: Command = {
     const [name] = argv;
     const handler = name ? HOOKS[name] : undefined;
     if (!handler) throw new TroveError(`hook what? ${Object.keys(HOOKS).join(", ")}`);
-    const reply = await replyOf(handler);
-    if (reply.message) io.error(reply.message);
-    return reply.code;
+    const [input, reply] = await replyOf(handler);
+    const kimiFeedback =
+      name === "post-edit" && input.client_type === "kimi_code_cli" && reply.code === 2;
+    if (reply.message) {
+      if (kimiFeedback) io.print(reply.message);
+      else io.error(reply.message);
+    }
+    return kimiFeedback ? EXIT.ok : reply.code;
   },
 };

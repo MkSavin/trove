@@ -9,6 +9,7 @@ import { syncStore } from "../core/sync/sync.ts";
 
 /** The part of an assistant's hook input trove reads: Claude Code sends `file_path`, Kimi Code `path`. */
 export type HookInput = {
+  client_type?: string;
   cwd?: string;
   tool_input?: { file_path?: string; path?: string };
   stop_hook_active?: boolean;

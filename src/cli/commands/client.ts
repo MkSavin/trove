@@ -49,7 +49,15 @@ export const addClients = async (
       ),
     );
   }
-  if (clients.includes("kimi")) await finishKimi(io, hooks);
+  if (clients.includes("kimi")) {
+    io.print(
+      paint(
+        "dim",
+        "  Kimi Code also has a user-level plugin with hooks: /plugins install https://github.com/MkSavin/trove",
+      ),
+    );
+    await finishKimi(io, hooks);
+  }
 };
 
 const clientAdd: Command = {

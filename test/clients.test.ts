@@ -234,14 +234,16 @@ describe("claude code hooks", () => {
   });
 });
 
-describe("plugin package", () => {
+describe("plugin packages", () => {
   const plugin = (rel: string) => Bun.file(join(ROOT, "plugin", rel)).json();
+  const kimiPlugin = () => Bun.file(join(ROOT, "kimi.plugin.json")).json();
 
-  test("its manifest version follows package.json", async () => {
+  test("their manifest versions follow package.json", async () => {
     expect((await plugin(".claude-plugin/plugin.json")).version).toBe(packageJson.version);
+    expect((await kimiPlugin()).version).toBe(packageJson.version);
   });
 
-  test("its MCP server, hooks and skills match what trove installs", async () => {
+  test("the Claude Code MCP server, hooks and skills match what trove installs", async () => {
     expect((await plugin(".mcp.json")).mcpServers[SERVER_NAME]).toEqual(SERVER);
     const hooks = JSON.stringify(await plugin("hooks/hooks.json"));
     expect(hooks).toContain('["hook","post-edit"]');
@@ -249,5 +251,29 @@ describe("plugin package", () => {
     expect((await readdir(join(ROOT, "plugin", "skills"))).toSorted()).toEqual(
       Object.keys(SKILLS).toSorted(),
     );
+  });
+
+  test("the Kimi Code manifest uses existing skills inside its plugin root", async () => {
+    const manifest = await kimiPlugin();
+    expect(manifest.name).toBe("trove");
+    expect(manifest.skills).toBe("./plugin/skills/");
+    expect((await readdir(join(ROOT, manifest.skills))).toSorted()).toEqual(
+      Object.keys(SKILLS).toSorted(),
+    );
+  });
+
+  // @anchor INV:clients/plugin-parity
+  test("the Kimi Code MCP server and hooks match what trove installs", async () => {
+    const manifest = await kimiPlugin();
+    expect(manifest.mcpServers[SERVER_NAME]).toEqual(SERVER);
+    expect(manifest.hooks).toEqual([
+      {
+        event: "PostToolUse",
+        matcher: "^(Write|Edit)$",
+        command: "trove hook post-edit",
+        timeout: 30,
+      },
+      { event: "Stop", command: "trove hook stop", timeout: 120 },
+    ]);
   });
 });

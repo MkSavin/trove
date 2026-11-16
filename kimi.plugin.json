@@ -1,0 +1,35 @@
+{
+  "name": "trove",
+  "version": "0.1.0",
+  "description": "Plain-Markdown audits, plans and specs with one checker, MCP tools and safe editing workflows.",
+  "keywords": ["documentation", "audits", "plans", "specs", "markdown", "mcp"],
+  "homepage": "https://github.com/MkSavin/trove",
+  "license": "MIT",
+  "skills": "./plugin/skills/",
+  "mcpServers": {
+    "trove": {
+      "command": "trove",
+      "args": ["mcp"]
+    }
+  },
+  "hooks": [
+    {
+      "event": "PostToolUse",
+      "matcher": "^(Write|Edit)$",
+      "command": "trove hook post-edit",
+      "timeout": 30
+    },
+    {
+      "event": "Stop",
+      "command": "trove hook stop",
+      "timeout": 120
+    }
+  ],
+  "interface": {
+    "displayName": "trove",
+    "shortDescription": "Audits, plans and specs in plain Markdown",
+    "longDescription": "Work in and migrate to trove stores through MCP tools, Agent Skills and automatic document checks. Requires the trove executable on PATH.",
+    "developerName": "Maxim Savin",
+    "websiteURL": "https://github.com/MkSavin/trove"
+  }
+}

@@ -32,11 +32,11 @@ A client is a row in `LAYOUTS`: where its MCP servers are registered and where i
 
 `--local` writes nothing into the project: a client with a user-level config has a row in `LOCAL_INSTALLERS`, any other refuses it. Claude Code keys servers per project there; Kimi Code's user level reaches every project. `replaceFile` writes through a temporary file, because that program may read the config at any moment. Kimi Code's hooks are appended to its `config.toml` and every existing byte stays, because that file holds credentials.
 
-Skills live once in `plugin/skills` and are bundled into the binary as text, so every client gets the same words. The Claude Code plugin in `plugin/` must match what `trove client add` installs; a test compares them.
+Skills live once in `plugin/skills` and are bundled into the binary as text, so every client gets the same words. The Claude Code plugin in `plugin/` must match what `trove client add` installs; a test compares them. The Kimi Code plugin has the same MCP server, skills and hooks through the root `kimi.plugin.json`, which GitHub installation discovers; its `./plugin/skills/` path stays inside the plugin root. Checked: INV:clients/plugin-parity
 
 ## Hooks
 
-`trove hook post-edit` reads the assistant's JSON from stdin (`src/clients/hooks.ts`): after an edit to a store's document it returns errors to the model with exit 2, and says the same way that a generated report will be overwritten. `trove hook stop` commits hand edits when the store syncs and is green. Outside a store both stay quiet. A crash in a hook exits 1, never 2: at Stop, exit 2 would keep the assistant running forever.
+`trove hook post-edit` reads the assistant's JSON from stdin (`src/clients/hooks.ts`): after an edit to a store's document it returns errors to the model, and says the same way that a generated report will be overwritten. Claude Code gets them on stderr with exit 2. Kimi Code's PostToolUse is observation-only, so its `client_type` selects stdout and exit 0 instead, the feedback channel Kimi can append to context. Checked: INV:kimi/observation-feedback. `trove hook stop` commits hand edits when the store syncs and is green. Outside a store both stay quiet. A crash in a hook exits 1, never 2: at Stop, exit 2 would keep the assistant running forever.
 
 ## Invariants
 

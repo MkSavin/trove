@@ -41,7 +41,9 @@ const add = async (...args: string[]) => {
 describe("client add kimi", () => {
   test("project: writes .kimi-code and touches no user-level file", async () => {
     await Bun.write(join(project(), ".kimi-code/mcp.json"), '{"mcpServers":{"other":{}}}');
-    expect((await add("kimi")).code).toBe(0);
+    const { code, out } = await add("kimi");
+    expect(code).toBe(0);
+    expect(out).toContain("/plugins install https://github.com/MkSavin/trove");
     expect(await Bun.file(join(project(), ".kimi-code/mcp.json")).json()).toEqual({
       mcpServers: { other: {}, [SERVER_NAME]: SERVER },
     });
@@ -176,10 +178,29 @@ describe("hooks with kimi input", () => {
   const spawnHook = async (name: string, input: unknown) => {
     const child = Bun.spawn(["bun", join(ROOT, "src", "cli", "main.ts"), "hook", name], {
       stdin: new Blob([typeof input === "string" ? input : JSON.stringify(input)]),
+      stdout: "pipe",
       stderr: "pipe",
     });
-    return { code: await child.exited, err: await new Response(child.stderr).text() };
+    return {
+      code: await child.exited,
+      out: await new Response(child.stdout).text(),
+      err: await new Response(child.stderr).text(),
+    };
   };
+
+  // @anchor INV:kimi/observation-feedback
+  test("post-edit returns diagnostics on stdout without trying to block Kimi", async () => {
+    const root = await store();
+    await breakRisks(root);
+    const reply = await spawnHook("post-edit", {
+      client_type: "kimi_code_cli",
+      cwd: root,
+      tool_input: { path: "RISKS.md" },
+    });
+    expect(reply.code).toBe(0);
+    expect(reply.out).toContain("RISKS.md:3 known-status");
+    expect(reply.err).toBe("");
+  });
 
   test("a relative path is resolved against cwd", async () => {
     const root = await store();
